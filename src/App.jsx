@@ -5,6 +5,7 @@ import { supabase } from './supabaseClient';
 import HomeMenu from './HomeMenu';
 import { SIZES, CRUSTS, SAUCE_LEVELS, VEGGIE_OPTIONS, MEAT_OPTIONS } from './menuData';
 import OrderReceiptModal from './OrderReceiptModal';
+import { getCustomerByPhone, createCustomer } from './api/api';
 
 
 const DEFAULT_PIZZA = {
@@ -16,20 +17,6 @@ const DEFAULT_PIZZA = {
 };
 
 export default function App() {
-  // testing the supbase connection on load
-   useEffect(() => {
-    async function testConnection() {
-      const { data, error } = await supabase.from('menu_items').select('*');
-      if (error) {
-        console.error('Supabase connection error:', error.message);
-      } else {
-        console.log('Supabase connected successfully! Menu items:', data);
-      }
-    }
-    testConnection();
-  }, []);
-
-
 
   // Navigation: 'landing' (Home/Menu showcase) vs 'order' (Customizer flow)
   const [currentView, setCurrentView] = useState('landing');
@@ -159,64 +146,32 @@ export default function App() {
   setSearchPhoneError('');
 
   try {
-    
-    const { data: customerData, error: customerError } = await supabase
-      .from('customers')
-      .select('*')
-      .ilike('phone_number', `%${cleanPhone}%`)
-      .limit(1);
+    // Look up customer through Spring Boot
+    const foundCustomer = await getCustomerByPhone(cleanPhone);
 
-    if (customerError) throw customerError;
+    if (foundCustomer) {
+        setCustomerId(foundCustomer.id);
+        setIsReturningUser(true);
+        setSearchPhoneError('');
 
-    if (customerData && customerData.length > 0) {
-      const foundCustomer = customerData[0];
-      setCustomerId(foundCustomer.id);
-      setIsReturningUser(true);
-      setSearchPhoneError('');
-
-      // Pre-fill form fields
-      setCustomerInfo((prev) => ({
-        ...prev,
-        name: `${foundCustomer.first_name || ''} ${foundCustomer.last_name || ''}`.trim(),
-        phone: formatPhoneNumber(foundCustomer.phone_number || ''),
-        streetAddress: foundCustomer.address || '',
-        subdivision: foundCustomer.subdivision || '',
-        nearestIntersection: foundCustomer.major_intersection || '',
-      }));
-
-      // Fetch customer's past orders with joined order_items
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('customer_id', foundCustomer.id)
-        .order('created_at', { ascending: false });
-
-      if (!ordersError && ordersData) {
-        setPastOrders(ordersData);
-      }
-
-      // fetch customer's saved card
-      const { data: cardsData, error: cardsError } = await supabase
-        .from('customer_payment_methods')
-        .select('*')
-        .eq('customer_id', foundCustomer.id)
-        .order('created_at', { ascending: false });
-
-      if(!cardsError && cardsData && cardsData.length > 0) {
-        const formattedCards = cardsData.map((c) => ({
-          id: c.id.toString(),
-          nickname: c.nickname,
-          brand: c.brand,
-          last4: c.last_four,
-          cardholderName: c.cardholder_name,
-          expiry: c.expiry,
+        // Pre-fill form fields
+        setCustomerInfo((prev) => ({
+            ...prev,
+            name: `${foundCustomer.firstName || ''} ${foundCustomer.lastName || ''}`.trim(),
+            phone: formatPhoneNumber(foundCustomer.phoneNumber || ''),
+            streetAddress: foundCustomer.address || '',
+            subdivision: foundCustomer.subdivision || '',
+            nearestIntersection: foundCustomer.majorIntersection || '',
         }));
-        setSavedCards(formattedCards);
-        setSelectedSavedCardId(formattedCards[0].id); // Defaults selection to latest card
-      } else {
+
+        console.log("Customer found through Spring Boot:", foundCustomer);
+
+        // Order history will be connected to Spring Boot later
+        setPastOrders([]);
+
+        // Saved payment methods will be connected later
         setSavedCards([]);
         setSelectedSavedCardId(null);
-      }
 
 
       setLookupMessage({
@@ -280,40 +235,30 @@ const handleReorderPizza = (item) => {
     try {
           const nameParts = customerInfo.name.trim().split(' ');
           const firstName = nameParts[0] || '';
-          const lastName = nameParts.slice(1).join(' ') || '';
-
-
-
-
-    
-   
-    if (!customerId) {
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([
-          {
-            first_name: firstName,
-            last_name: lastName,
-            phone_number: rawDigitsOnly,
-            address: customerInfo.streetAddress,
-            subdivision: customerInfo.subdivision,
-            major_intersection: customerInfo.nearestIntersection,
-          },
-        ])
-        .select();
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setCustomerId(data[0].id);
-        }
-      }
-
-      setActiveStep('builder');
-    } catch (err) {
-      console.error('Error saving customer:', err.message || err);
-      alert('Failed to save customer details.');
-    }
-  };
+          const lastName = nameParts.slice(1).join(' ') || ''
+          
+          if (!customerId) {
+            const newCustomer = await createCustomer({
+              firstName: firstName,
+              lastName: lastName,
+              phoneNumber: rawDigitsOnly,
+              address: customerInfo.streetAddress,
+              subdivision: customerInfo.subdivision,
+              majorIntersection: customerInfo.nearestIntersection,
+            });
+          
+            setCustomerId(newCustomer.id);
+          
+            console.log("Customer created through Spring Boot:", newCustomer);
+          }
+          
+          setActiveStep('builder');
+          
+          } catch (err) {
+            console.error('Error saving customer:', err.message || err);
+            alert('Failed to save customer details.');
+          }
+          };
 
   // Toggle Veggie selection
   const toggleVeggie = (veggie) => {

@@ -1,7 +1,7 @@
 // src/HomeMenu.jsx
 // src/HomeMenu.jsx
 import { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
+import { getMenu } from './api/api';
 import { SIZES, CRUSTS, VEGGIE_OPTIONS, MEAT_OPTIONS } from './menuData';
 
 export default function HomeMenu({ onOrderNow }) {
@@ -14,25 +14,28 @@ export default function HomeMenu({ onOrderNow }) {
   // fetching live menu items on mount
   useEffect(() => {
     async function loadMenu() {
-      const { data, error } = await supabase
-       .from('menu_items')
-       .select('*');
-
-       if (error) {
-        console.warn('Could not load menu_items from DB, using fallback menuData:', error.message);  
-       } else if (data && data.length > 0) {
-        setDbMenuItems(data);
-       }
+        try {
+            const data = await getMenu();
+            setDbMenuItems(
+                data.map(item => ({
+                    ...item,
+                    category: item.category.toLowerCase()
+                }))
+            );
+            console.log("Menu loaded from Spring Boot:", data);
+        } catch (error) {
+            console.error("Failed to load menu:", error);
+        }
     }
     loadMenu();
-  }, []);
+}, []);
 
   // fallback logic --> use DB items if present, otherwise menuData.js
   const liveSizes = dbMenuItems.filter((i) => i.category === 'size').length > 0
     ? dbMenuItems.filter((i) => i.category === 'size').map((s) => ({
       label: s.name,
       description: s.description,
-      print: Number(s.price),
+      price: Number(s.price),
     }))
     : SIZES;
 
