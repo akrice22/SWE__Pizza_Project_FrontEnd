@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+/* Lets a panel scroll normally (wheel, trackpad, touch) without showing the
+   scrollbar track. Firefox/old Edge use the properties, Chrome/Safari need the
+   pseudo-element. */
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -274,8 +274,15 @@ export default function HomeMenu({ onOrderNow }) {
                   </span>
                 </div>
 
-                {/* Middle: Expanded Content vs Collapsed Header */}
-                <div className="my-4 space-y-3 flex-1 flex flex-col justify-center">
+                {/* Middle: Expanded Content vs Collapsed Header.
+                    min-h-0 matters here - without it this flex child refuses to shrink
+                    below its content, so the item list gets clipped by the card instead
+                    of scrolling. Open cards also pin to the top so the list has room. */}
+                <div
+                  className={`my-4 space-y-3 flex-1 min-h-0 flex flex-col ${
+                    isActive ? 'justify-start' : 'justify-center'
+                  }`}
+                >
                   <div>
                     <h4 className="font-serif uppercase tracking-wider text-stone-100 text-lg sm:text-xl font-bold">
                       {section.title}
@@ -292,12 +299,17 @@ export default function HomeMenu({ onOrderNow }) {
                     </span>
                   </div>
 
-                  {/* Expanded Item List (Smooth Fade in when expanded) */}
+                  {/* Expanded Item List (fades in when the card opens).
+                      On desktop the card has a fixed height, so the list takes whatever
+                      space is left and scrolls inside it. On mobile the cards stack and
+                      grow, so we fall back to a max height. The scrollbar is hidden to keep
+                      the card clean, but wheel/trackpad/touch scrolling still works, and
+                      overscroll-contain stops the page from scrolling once you hit the end. */}
                   <div
-                     className={`transition-all duration-500 ease-in-out overflow-hidden ${
+                     className={`transition-all duration-500 ease-in-out ${
                        isActive
-                         ? 'max-h-80 opacity-100 mt-3 pt-1 pr-1 overflow-y-auto'
-                         : 'max-h-0 opacity-0 mt-0 pt-0 pointer-events-none'
+                         ? 'max-h-80 lg:max-h-none lg:flex-1 min-h-0 opacity-100 mt-3 pt-1 overflow-y-auto overscroll-contain scrollbar-hidden'
+                         : 'max-h-0 opacity-0 mt-0 pt-0 overflow-hidden pointer-events-none'
                       }`}
                   >
                    <div className="space-y-2">
@@ -306,10 +318,11 @@ export default function HomeMenu({ onOrderNow }) {
                         key={i}
                         className="flex justify-between items-center text-xs py-1.5 px-3 rounded-xl bg-stone-900/70 border border-stone-800/60"
                       >
-                       <div className="truncate pr-2">
+                       <div className="min-w-0 pr-2">
                          <span className="font-semibold text-stone-200 block truncate">{item.name}</span>
+                         {/* Ingredients wrap instead of getting cut off with "..." */}
                          {item.detail && (
-                          <span className="block text-[10px] text-stone-500 font-light truncate">
+                          <span className="block text-[10px] text-stone-500 font-light leading-snug">
                            {item.detail}
                           </span>
                         )}
