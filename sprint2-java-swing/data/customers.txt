@@ -1,0 +1,4 @@
+# id|name|phone|orderType|streetAddress|subdivision|nearestIntersection
+1|Jane Doe|5555555555|delivery|123 Oak Street|Amber Ridge Apt 4B|Main St & 4th Ave
+2|James Smith|1241837581|delivery|555 Freemont Circle|Bethesda|Oak Rd & Pine St
+3|Juan Ramos|5551234567|delivery|105 Ardenlee Dr|Oakridge|Maple & 5th
