@@ -7,10 +7,18 @@ import com.momandpop.pizza.model.OrderRecord;
 import com.momandpop.pizza.model.StaffUser;
 import com.momandpop.pizza.storage.DataStore;
 import com.momandpop.pizza.ui.PizzaAppFrame;
+import com.momandpop.pizza.ui.Theme;
 
+import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 
@@ -37,6 +45,10 @@ public final class MomAndPopPizzaApp {
 
         if (args != null && args.length > 0 && "--smoke-test".equalsIgnoreCase(args[0])) {
             runSmokeTest(dataStore);
+            return;
+        }
+        if (args != null && args.length >= 2 && "--render-screenshots".equalsIgnoreCase(args[0])) {
+            renderScreenshots(dataStore, Paths.get(args[1]));
             return;
         }
 
@@ -122,5 +134,92 @@ public final class MomAndPopPizzaApp {
                 + ", staffCount=" + dataStore.loadStaffUsers().size()
                 + ", customerCount=" + dataStore.loadCustomers().size()
                 + ", orderCount=" + dataStore.loadOrders().size());
+    }
+
+    /**
+     * Renders all 5 application screens offscreen to PNG images for visual quality inspection.
+     *
+     * @param dataStore initialized {@link DataStore} instance
+     * @param outDir    output directory for generated PNG images
+     */
+    private static void renderScreenshots(DataStore dataStore, Path outDir) {
+        configureLookAndFeel();
+        try {
+            Files.createDirectories(outDir);
+            SwingUtilities.invokeAndWait(() -> {
+                PizzaAppFrame frame = new PizzaAppFrame(dataStore);
+                frame.setSize(1280, 860);
+                frame.addNotify();
+                Container rootContent = frame.getContentPane();
+                rootContent.setBounds(0, 0, 1280, 860);
+                layoutComponentTree(rootContent);
+
+                // Prepare populated state across customer, menu, checkout, and admin views
+                Customer jane = dataStore.findCustomerByPhone("5555555555");
+                frame.getCustomerPanel().performPhoneLookup("5555555555");
+                frame.getMenuOrderPanel().addItemDirectlyToCart(OrderItem.createPizza(
+                        "Medium (12\")", "Thin & Crispy", "Normal Sauce",
+                        Arrays.asList("Artisan Pepperoni", "Extra Mozzarella Cheese"), 17.24));
+                frame.getMenuOrderPanel().addItemDirectlyToCart(OrderItem.createBeverage(
+                        "San Pellegrino Limonata", "Medium (20 oz)", 3.00, 1));
+                List<OrderRecord> orders = dataStore.loadOrders();
+                if (!orders.isEmpty()) {
+                    frame.getCheckoutReceiptPanel().previewOrderRecord(orders.get(orders.size() - 1));
+                }
+
+                String[] cards = {
+                        PizzaAppFrame.CARD_LOGIN,
+                        PizzaAppFrame.CARD_CUSTOMER,
+                        PizzaAppFrame.CARD_MENU,
+                        PizzaAppFrame.CARD_CHECKOUT,
+                        PizzaAppFrame.CARD_ADMIN
+                };
+                for (int i = 0; i < cards.length; i++) {
+                    if (PizzaAppFrame.CARD_ADMIN.equals(cards[i])) {
+                        StaffUser owner = dataStore.authenticateStaff("owner", "pizza123");
+                        if (owner != null) {
+                            frame.onStaffAuthenticated(owner);
+                        }
+                    } else {
+                        frame.showCard(cards[i]);
+                    }
+                    rootContent.setBounds(0, 0, 1280, 860);
+                    layoutComponentTree(rootContent);
+
+                    BufferedImage img = new BufferedImage(1280, 860, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D g2 = img.createGraphics();
+                    g2.setColor(Theme.BG_APP);
+                    g2.fillRect(0, 0, 1280, 860);
+                    rootContent.printAll(g2);
+                    g2.dispose();
+
+                    try {
+                        ImageIO.write(img, "png", outDir.resolve((i + 1) + "_" + cards[i].toLowerCase() + ".png").toFile());
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+                frame.dispose();
+                if (jane != null) {
+                    System.out.println("RENDERED 5 SCREENSHOTS TO " + outDir.toAbsolutePath());
+                }
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Screenshot rendering failed", ex);
+        }
+    }
+
+    /**
+     * Recursively validates and lays out a Swing container tree for offscreen rendering.
+     *
+     * @param container root container to lay out recursively
+     */
+    private static void layoutComponentTree(Container container) {
+        container.doLayout();
+        for (Component child : container.getComponents()) {
+            if (child instanceof Container) {
+                layoutComponentTree((Container) child);
+            }
+        }
     }
 }

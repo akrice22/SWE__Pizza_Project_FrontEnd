@@ -10,19 +10,18 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.GridLayout;
-import java.awt.Insets;
 
 /**
- * Styled Home &amp; Login screen featuring the Mom &amp; Pop Pizzeria hero banner,
- * returning customer quick-order launcher, and password-protected Staff Portal sign-in.
+ * Polished Home &amp; Login screen matching Figures 5A and 5B: atmospheric hero banner,
+ * 3-column craftsmanship strip, 5-column menu showcase cards, returning customer quick launcher,
+ * and password-protected Staff Portal sign-in.
  */
 public class LoginPanel extends JPanel {
 
@@ -65,55 +64,58 @@ public class LoginPanel extends JPanel {
     }
 
     /**
-     * Initializes the centered hero showcase, feature highlights, and dual action cards.
+     * Initializes the scrollable landing showcase and dual action portals.
      */
     private void buildLayout() {
-        setLayout(new GridBagLayout());
+        setLayout(new BorderLayout());
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(20, 32, 24, 32));
 
         JPanel container = new JPanel();
         container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-        container.setOpaque(false);
-        container.setMaximumSize(new Dimension(980, 680));
+        container.setBackground(Theme.BG_APP);
+        container.setBorder(BorderFactory.createEmptyBorder(20, 44, 28, 44));
 
         container.add(buildHeroBanner());
         container.add(Box.createVerticalStrut(14));
         container.add(buildFeatureStrip());
+        container.add(Box.createVerticalStrut(14));
+        container.add(buildMenuShowcaseStrip());
         container.add(Box.createVerticalStrut(16));
 
         JPanel twoCols = new JPanel(new GridLayout(1, 2, 18, 0));
         twoCols.setOpaque(false);
+        twoCols.setMaximumSize(new Dimension(2400, 300));
         twoCols.add(buildCustomerCard());
         twoCols.add(buildStaffCard());
         container.add(twoCols);
 
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
-        add(container, gbc);
+        JScrollPane scroll = new JScrollPane(container);
+        Theme.styleScrollPane(scroll);
+        scroll.setBorder(null);
+        add(scroll, BorderLayout.CENTER);
     }
 
     /**
-     * Builds the top hero showcase banner matching the landing page aesthetic.
+     * Builds the top hero showcase banner with warm hearth glow matching Figure 5A.
      *
      * @return constructed hero banner {@link JPanel}
      */
     private JPanel buildHeroBanner() {
-        Theme.RoundedCardPanel hero = Theme.createAmberCardPanel(null);
+        Theme.RoundedCardPanel hero = Theme.createHeroCardPanel();
         hero.setLayout(new BoxLayout(hero, BoxLayout.Y_AXIS));
+        hero.setBorder(BorderFactory.createEmptyBorder(28, 30, 28, 30));
 
         JLabel eyebrow = new JLabel("STONE OVEN HEARTH & KITCHEN");
-        eyebrow.setFont(Theme.FONT_LABEL);
+        eyebrow.setFont(new java.awt.Font("Monospaced", java.awt.Font.BOLD, 11));
         eyebrow.setForeground(Theme.ACCENT_AMBER);
         eyebrow.setAlignmentX(CENTER_ALIGNMENT);
 
-        JLabel headline = new JLabel("STONE-FIRED with SOUL", SwingConstants.CENTER);
+        JLabel headline = new JLabel("<html><center>STONE-FIRED<br/><i><font color='#FDE68A'>with</font></i> SOUL</center></html>", SwingConstants.CENTER);
         headline.setFont(Theme.FONT_HERO);
         headline.setForeground(Theme.TEXT_PRIMARY);
         headline.setAlignmentX(CENTER_ALIGNMENT);
 
-        JLabel sub = new JLabel("Slow-fermented 48-hour sourdough, crushed San Marzano tomatoes, and craft beverages.", SwingConstants.CENTER);
+        JLabel sub = new JLabel("Slow-fermented 48-hour dough, crushed San Marzano tomatoes, and whole milk mozzarella.", SwingConstants.CENTER);
         sub.setFont(Theme.FONT_BODY);
         sub.setForeground(Theme.TEXT_MUTED);
         sub.setAlignmentX(CENTER_ALIGNMENT);
@@ -123,35 +125,35 @@ public class LoginPanel extends JPanel {
         cta.addActionListener(e -> frame.startFreshCustomerOrder());
 
         hero.add(eyebrow);
-        hero.add(Box.createVerticalStrut(6));
+        hero.add(Box.createVerticalStrut(8));
         hero.add(headline);
-        hero.add(Box.createVerticalStrut(6));
+        hero.add(Box.createVerticalStrut(8));
         hero.add(sub);
-        hero.add(Box.createVerticalStrut(14));
+        hero.add(Box.createVerticalStrut(16));
         hero.add(cta);
         return hero;
     }
 
     /**
-     * Builds the 3-column artisan craftsmanship highlight strip.
+     * Builds the 3-column craftsmanship highlight strip directly beneath the hero banner.
      *
      * @return constructed strip {@link JPanel}
      */
     private JPanel buildFeatureStrip() {
         JPanel strip = new JPanel(new GridLayout(1, 3, 14, 0));
         strip.setOpaque(false);
-        strip.add(buildHighlightCard("01. 48-HOUR COLD FERMENT", "Naturally leavened dough rested cold for airy, blistered crusts."));
-        strip.add(buildHighlightCard("02. HAND-STRETCHED & FIRED", "Choose from 4 sizes, 4 crusts, and up to 4 gourmet toppings."));
-        strip.add(buildHighlightCard("03. FAST LOCAL DELIVERY", "Flat $3.99 neighborhood delivery or free counter pickup."));
+        strip.add(buildHighlightCard("01. 48-HOUR COLD FERMENT", "Our naturally leavened dough rests cold for two full days to build airy, blistered crusts."));
+        strip.add(buildHighlightCard("02. HAND-STRETCHED & FIRED", "Each pie is shaped by hand on marble slabs and baked at 800°F on stone hearths."));
+        strip.add(buildHighlightCard("03. FAST LOCAL DELIVERY", "From oven to box to your doorstep for a flat $3.99 fee, or free counter pickup."));
         return strip;
     }
 
     /**
-     * Builds one small highlight block inside the feature strip.
+     * Builds one highlight card inside the craftsmanship strip.
      *
-     * @param title   highlight title
-     * @param details highlight description
-     * @return constructed highlight {@link JPanel}
+     * @param title   highlight heading
+     * @param details highlight copy
+     * @return styled {@link JPanel}
      */
     private JPanel buildHighlightCard(String title, String details) {
         Theme.RoundedCardPanel card = Theme.createCardPanel(null);
@@ -159,12 +161,63 @@ public class LoginPanel extends JPanel {
         JLabel t = new JLabel(title);
         t.setFont(Theme.FONT_LABEL);
         t.setForeground(Theme.ACCENT_AMBER);
-        JLabel d = new JLabel("<html><body style='width:220px'>" + details + "</body></html>");
+        JLabel d = new JLabel("<html><body style='width:260px'>" + details + "</body></html>");
         d.setFont(Theme.FONT_BODY);
         d.setForeground(Theme.TEXT_MUTED);
         card.add(t);
-        card.add(Box.createVerticalStrut(4));
+        card.add(Box.createVerticalStrut(5));
         card.add(d);
+        return card;
+    }
+
+    /**
+     * Builds the 5-card Provisions &amp; Craft Menu Overview strip matching Figure 5B.
+     *
+     * @return constructed menu overview {@link JPanel}
+     */
+    private JPanel buildMenuShowcaseStrip() {
+        JPanel strip = new JPanel(new GridLayout(1, 5, 10, 0));
+        strip.setOpaque(false);
+        strip.add(buildMenuMiniCard("[01]", "SIZES & BASE", "$10.99 – $19.99", "Small 10\" to X-Large 16\""));
+        strip.add(buildMenuMiniCard("[02]", "ARTISAN CRUSTS", "4 Styles", "Hand-Tossed, Thin, Thick, Garlic"));
+        strip.add(buildMenuMiniCard("[03]", "VEGGIES & CHEESE", "+$1.00 – $1.50", "Extra Cheese, Mushrooms, Olives"));
+        strip.add(buildMenuMiniCard("[04]", "SAVORY MEATS", "+$1.75 – $2.50", "Pepperoni, Sausage, Prosciutto"));
+        strip.add(buildMenuMiniCard("[05]", "CRAFT DRINKS", "3 Drink Sizes", "Mexican Coke, San Pellegrino"));
+        return strip;
+    }
+
+    /**
+     * Builds one compact menu showcase card for the landing preview.
+     *
+     * @param tag     numeric tag (e.g. "[01]")
+     * @param title   category title
+     * @param badge   pricing badge text
+     * @param summary short description
+     * @return styled mini card {@link JPanel}
+     */
+    private JPanel buildMenuMiniCard(String tag, String title, String badge, String summary) {
+        Theme.RoundedCardPanel card = Theme.createCardPanel(null);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        JLabel tagLbl = new JLabel(tag);
+        tagLbl.setFont(new java.awt.Font("Monospaced", java.awt.Font.BOLD, 10));
+        tagLbl.setForeground(Theme.ACCENT_AMBER);
+        JLabel titleLbl = new JLabel(title);
+        titleLbl.setFont(new java.awt.Font("Georgia", java.awt.Font.BOLD, 13));
+        titleLbl.setForeground(Theme.TEXT_PRIMARY);
+        JLabel badgeLbl = new JLabel(badge);
+        badgeLbl.setFont(Theme.FONT_MONO_BOLD);
+        badgeLbl.setForeground(Theme.ACCENT_AMBER);
+        JLabel sumLbl = new JLabel("<html><body style='width:140px'>" + summary + "</body></html>");
+        sumLbl.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
+        sumLbl.setForeground(Theme.TEXT_MUTED);
+
+        card.add(tagLbl);
+        card.add(Box.createVerticalStrut(4));
+        card.add(titleLbl);
+        card.add(Box.createVerticalStrut(4));
+        card.add(badgeLbl);
+        card.add(Box.createVerticalStrut(4));
+        card.add(sumLbl);
         return card;
     }
 
@@ -174,38 +227,31 @@ public class LoginPanel extends JPanel {
      * @return constructed customer entry card {@link JPanel}
      */
     private JPanel buildCustomerCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Customer Ordering Portal");
-        card.setLayout(new BorderLayout(0, 12));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Customer Portal", "Quick Lookup & Start Order", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 12));
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setOpaque(false);
 
-        JLabel title = new JLabel("Returning Customer Quick Lookup");
-        title.setFont(Theme.FONT_SUBTITLE);
-        title.setForeground(Theme.TEXT_PRIMARY);
-
-        JLabel desc = new JLabel("<html><body style='width:320px'>Look up saved delivery info &amp; past orders using your 10-digit phone (e.g. <b>5555555555</b>), or start a new guest order.</body></html>");
+        JLabel desc = new JLabel("<html><body style='width:380px'>Enter a returning customer's 10-digit phone (e.g. <b>5555555555</b> for Jane Doe) to auto-fill address &amp; past orders, or start fresh.</body></html>");
         desc.setFont(Theme.FONT_BODY);
         desc.setForeground(Theme.TEXT_MUTED);
-
-        JPanel phoneInputRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 4));
-        phoneInputRow.setOpaque(false);
-        phoneInputRow.add(Theme.createFieldLabel("PHONE NUMBER (10 DIGITS)"));
+        desc.setAlignmentX(LEFT_ALIGNMENT);
 
         customerPhoneField.setText("5555555555");
+        JPanel phoneStack = Theme.createStackedInput("RETURNING CUSTOMER PHONE (10 DIGITS)", customerPhoneField);
+        phoneStack.setAlignmentX(LEFT_ALIGNMENT);
 
-        body.add(title);
-        body.add(Box.createVerticalStrut(4));
         body.add(desc);
-        body.add(Box.createVerticalStrut(10));
-        body.add(phoneInputRow);
-        body.add(customerPhoneField);
+        body.add(Box.createVerticalStrut(12));
+        body.add(phoneStack);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         actions.setOpaque(false);
 
-        JButton lookupBtn = Theme.createPrimaryButton("Lookup Customer →");
+        JButton lookupBtn = Theme.createPrimaryButton("Lookup & Start Order →");
         lookupBtn.addActionListener(e -> frame.startCustomerOrderWithPhone(customerPhoneField.getText()));
 
         JButton startFreshBtn = Theme.createSecondaryButton("New Guest Order");
@@ -214,8 +260,8 @@ public class LoginPanel extends JPanel {
         actions.add(lookupBtn);
         actions.add(startFreshBtn);
 
-        card.add(body, BorderLayout.CENTER);
-        card.add(actions, BorderLayout.SOUTH);
+        content.add(body, BorderLayout.CENTER);
+        content.add(actions, BorderLayout.SOUTH);
         return card;
     }
 
@@ -225,58 +271,38 @@ public class LoginPanel extends JPanel {
      * @return constructed staff login card {@link JPanel}
      */
     private JPanel buildStaffCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("🔒 Staff & Owner Terminal Login");
-        card.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("🔒 Staff Access", "Owner & Manager Terminal Login", true);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setOpaque(false);
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(5, 0, 5, 10);
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.anchor = GridBagConstraints.WEST;
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setOpaque(false);
 
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 2;
-        JLabel hint = new JLabel("<html>Admin access is password-protected (verified against <code>data/staff.txt</code>). Default: <b>owner</b> / <b>pizza123</b></html>");
-        hint.setFont(Theme.FONT_BODY);
-        hint.setForeground(Theme.TEXT_MUTED);
-        form.add(hint, c);
+        JPanel inputsRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        inputsRow.setOpaque(false);
+        inputsRow.setAlignmentX(LEFT_ALIGNMENT);
+        inputsRow.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 64));
+        inputsRow.add(Theme.createStackedInput("STAFF USERNAME", usernameField));
+        inputsRow.add(Theme.createStackedInput("SECURITY PASSWORD", passwordField));
 
-        c.gridwidth = 1;
-        c.gridy = 1;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        form.add(Theme.createFieldLabel("USERNAME"), c);
-
-        c.gridx = 1;
-        c.weightx = 1.0;
-        form.add(usernameField, c);
-
-        c.gridy = 2;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        form.add(Theme.createFieldLabel("PASSWORD"), c);
-
-        c.gridx = 1;
-        c.weightx = 1.0;
-        form.add(passwordField, c);
-
-        c.gridy = 3;
-        c.gridx = 0;
-        c.gridwidth = 2;
         statusLabel.setFont(Theme.FONT_BODY);
-        statusLabel.setForeground(Theme.STATUS_ERROR);
-        form.add(statusLabel, c);
+        statusLabel.setForeground(Theme.TEXT_MUTED);
+        statusLabel.setText("Verify credentials from data/staff.txt (e.g., owner / pizza123).");
+        statusLabel.setAlignmentX(LEFT_ALIGNMENT);
 
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        body.add(inputsRow);
+        body.add(Box.createVerticalStrut(10));
+        body.add(statusLabel);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         btnPanel.setOpaque(false);
         JButton loginBtn = Theme.createPrimaryButton("Unlock Staff Dashboard →");
         loginBtn.addActionListener(e -> handleStaffLogin());
         btnPanel.add(loginBtn);
 
-        card.add(form, BorderLayout.CENTER);
-        card.add(btnPanel, BorderLayout.SOUTH);
+        content.add(body, BorderLayout.CENTER);
+        content.add(btnPanel, BorderLayout.SOUTH);
         return card;
     }
 
@@ -286,7 +312,8 @@ public class LoginPanel extends JPanel {
     public void clearPasswordInputs() {
         usernameField.setText("");
         passwordField.setText("");
-        statusLabel.setText(" ");
+        statusLabel.setForeground(Theme.TEXT_MUTED);
+        statusLabel.setText("Terminal locked. Sign in again to access Management Dashboard.");
     }
 
     /**

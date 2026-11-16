@@ -12,26 +12,25 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSpinner;
 import javax.swing.ListCellRenderer;
-import javax.swing.SpinnerNumberModel;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Step 2 ordering screen featuring interactive pill selectors for Pizza Sizes (4),
- * Crusts (4), Sauces (3), Toppings (12 with strict max-4 cap), Beverages (6 across 3 sizes),
- * real-time price updates, and a custom-rendered Order Cart.
+ * Step 2 ordering screen matching Figure 8 &amp; Figure 9A with zero legacy Swing dropdowns or spinners:
+ * interactive card toggles for Sizes (4), Crusts (4), Sauces (3), Toppings (13 with strict max-4 cap),
+ * a 3x2 Craft Drink Grid across 3 Beverage Sizes, and a custom-rendered Order Cart.
  */
 public class MenuOrderPanel extends JPanel {
 
@@ -68,8 +67,8 @@ public class MenuOrderPanel extends JPanel {
     /** Currently selected sauce label. */
     private String selectedSauce;
 
-    /** Toggle pills representing the 12 available toppings. */
-    private final List<Theme.TogglePillButton> toppingPills;
+    /** Horizontal toggle rows representing all available toppings. */
+    private final List<Theme.MenuRowToggle> toppingRows;
 
     /** Warning label displayed when user hits or exceeds the 4-topping limit. */
     private final JLabel toppingCounterLabel;
@@ -83,20 +82,14 @@ public class MenuOrderPanel extends JPanel {
     /** Index of the pizza currently being edited, or {@code -1} when adding new. */
     private int editingCartIndex;
 
-    /** Dropdown selector for the 6 craft beverages. */
-    private final JComboBox<MenuOption> beverageCombo;
-
     /** Toggle pills for the 3 beverage sizes. */
     private final List<Theme.TogglePillButton> beverageSizePills;
 
+    /** Drink price labels inside the 6 drink cards so they update live when size changes. */
+    private final List<JLabel> drinkCardPriceLabels;
+
     /** Currently selected beverage size option. */
     private transient MenuOption selectedBeverageSize;
-
-    /** Quantity spinner for adding beverages. */
-    private final JSpinner beverageQtySpinner;
-
-    /** Live price label for the currently selected beverage. */
-    private final JLabel liveBeveragePriceLabel;
 
     /** Cart subtotal label. */
     private final JLabel subtotalLabel;
@@ -123,22 +116,19 @@ public class MenuOrderPanel extends JPanel {
         this.sizePills = new ArrayList<>();
         this.crustPills = new ArrayList<>();
         this.saucePills = new ArrayList<>();
-        this.toppingPills = new ArrayList<>();
+        this.toppingRows = new ArrayList<>();
         this.beverageSizePills = new ArrayList<>();
+        this.drinkCardPriceLabels = new ArrayList<>();
 
         this.selectedSize = MenuCatalog.PIZZA_SIZES.get(1);
         this.selectedCrust = MenuCatalog.CRUST_OPTIONS.get(0);
         this.selectedSauce = MenuCatalog.SAUCE_LEVELS.get(1);
         this.selectedBeverageSize = MenuCatalog.BEVERAGE_SIZES.get(0);
 
-        this.toppingCounterLabel = new JLabel("Selected Toppings: 0 / 4 (Maximum 4 toppings per pizza)");
+        this.toppingCounterLabel = new JLabel("Selected Toppings: 0 / 4 (Max 4)");
         this.livePizzaPriceLabel = new JLabel("Item Price: $13.99");
-        this.addPizzaBtn = Theme.createPrimaryButton("+ Add Pizza to Order");
+        this.addPizzaBtn = Theme.createPrimaryButton("ADD TO ORDER");
         this.editingCartIndex = -1;
-
-        this.beverageCombo = new JComboBox<>(MenuCatalog.BEVERAGES.toArray(new MenuOption[0]));
-        this.beverageQtySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 20, 1));
-        this.liveBeveragePriceLabel = new JLabel("Drink Total: $2.50");
 
         this.subtotalLabel = new JLabel("Subtotal: $0.00");
         this.deliveryFeeLabel = new JLabel("Delivery Fee: $3.99");
@@ -147,29 +137,29 @@ public class MenuOrderPanel extends JPanel {
 
         buildLayout();
         resetPizzaBuilder();
-        updateLiveBeveragePrice();
+        updateDrinkCardPrices();
         refreshCartSummary();
     }
 
     /**
-     * Assembles the two-column Menu Builder (left) and Styled Order Cart (right).
+     * Assembles the scrollable Left Customizer Column (Pizza + Drinks) and Right Order Cart Column.
      */
     private void buildLayout() {
         setLayout(new BorderLayout(16, 12));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 20));
+        setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
 
         JPanel leftColumn = new JPanel();
         leftColumn.setLayout(new BoxLayout(leftColumn, BoxLayout.Y_AXIS));
-        leftColumn.setOpaque(false);
+        leftColumn.setBackground(Theme.BG_APP);
+        leftColumn.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 8));
         leftColumn.add(buildPizzaBuilderCard());
-        leftColumn.add(Box.createVerticalStrut(12));
-        leftColumn.add(buildBeverageCard());
+        leftColumn.add(Box.createVerticalStrut(14));
+        leftColumn.add(buildBeverageGridCard());
 
         JScrollPane leftScroll = new JScrollPane(leftColumn);
+        Theme.styleScrollPane(leftScroll);
         leftScroll.setBorder(null);
-        leftScroll.getViewport().setBackground(Theme.BG_APP);
-        leftScroll.getVerticalScrollBar().setUnitIncrement(16);
 
         JPanel rightColumn = buildCartCard();
 
@@ -182,16 +172,17 @@ public class MenuOrderPanel extends JPanel {
     }
 
     /**
-     * Builds the custom Pizza Builder card with visual pill selectors and max-4 topping grid.
+     * Builds the custom Pizza Builder card matching Figure 8.
      *
      * @return constructed pizza builder {@link JPanel}
      */
     private JPanel buildPizzaBuilderCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Step 2A • Build Your Custom Pizza");
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Step 02", "Build Custom Pie", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
         // 1. Sizes (4 options)
-        card.add(leftLabel("1. SELECT SIZE (4 OPTIONS)"));
+        content.add(leftLabel("1. PIZZA SIZE (4 OPTIONS)"));
         JPanel sizeGrid = new JPanel(new GridLayout(1, 4, 8, 0));
         sizeGrid.setOpaque(false);
         ButtonGroup sizeGroup = new ButtonGroup();
@@ -208,12 +199,12 @@ public class MenuOrderPanel extends JPanel {
             sizePills.add(pill);
             sizeGrid.add(pill);
         }
-        card.add(Box.createVerticalStrut(4));
-        card.add(sizeGrid);
-        card.add(Box.createVerticalStrut(10));
+        content.add(Box.createVerticalStrut(4));
+        content.add(sizeGrid);
+        content.add(Box.createVerticalStrut(12));
 
         // 2. Crusts (4 options)
-        card.add(leftLabel("2. SELECT ARTISAN CRUST (4 OPTIONS)"));
+        content.add(leftLabel("2. ARTISAN CRUST (4 OPTIONS)"));
         JPanel crustGrid = new JPanel(new GridLayout(1, 4, 8, 0));
         crustGrid.setOpaque(false);
         ButtonGroup crustGroup = new ButtonGroup();
@@ -231,12 +222,12 @@ public class MenuOrderPanel extends JPanel {
             crustPills.add(pill);
             crustGrid.add(pill);
         }
-        card.add(Box.createVerticalStrut(4));
-        card.add(crustGrid);
-        card.add(Box.createVerticalStrut(10));
+        content.add(Box.createVerticalStrut(4));
+        content.add(crustGrid);
+        content.add(Box.createVerticalStrut(12));
 
         // 3. Sauce (3 levels)
-        card.add(leftLabel("3. SELECT SAUCE LEVEL"));
+        content.add(leftLabel("3. SAUCE LEVEL"));
         JPanel sauceGrid = new JPanel(new GridLayout(1, 3, 8, 0));
         sauceGrid.setOpaque(false);
         ButtonGroup sauceGroup = new ButtonGroup();
@@ -249,39 +240,41 @@ public class MenuOrderPanel extends JPanel {
             saucePills.add(pill);
             sauceGrid.add(pill);
         }
-        card.add(Box.createVerticalStrut(4));
-        card.add(sauceGrid);
-        card.add(Box.createVerticalStrut(12));
+        content.add(Box.createVerticalStrut(4));
+        content.add(sauceGrid);
+        content.add(Box.createVerticalStrut(14));
 
-        // 4. Toppings (Max 4 enforced)
+        // 4. Toppings Selection (Two vertical columns matching Figure 8)
         JPanel topHeader = new JPanel(new BorderLayout());
         topHeader.setOpaque(false);
-        topHeader.add(leftLabel("4. SELECT TOPPINGS (MAX 4 PER PIZZA)"), BorderLayout.WEST);
+        topHeader.add(leftLabel("4. TOPPINGS SELECTION (MAX 4 PER PIZZA)"), BorderLayout.WEST);
         toppingCounterLabel.setFont(Theme.FONT_LABEL);
         toppingCounterLabel.setForeground(Theme.ACCENT_AMBER);
         topHeader.add(toppingCounterLabel, BorderLayout.EAST);
-        card.add(topHeader);
-        card.add(Box.createVerticalStrut(6));
+        content.add(topHeader);
+        content.add(Box.createVerticalStrut(6));
 
-        JPanel toppingSplit = new JPanel(new GridLayout(1, 2, 10, 0));
+        JPanel toppingSplit = new JPanel(new GridLayout(1, 2, 12, 0));
         toppingSplit.setOpaque(false);
 
-        Theme.RoundedCardPanel veggieCard = Theme.createCardPanel("Garden Veggies");
-        veggieCard.setLayout(new GridLayout(3, 2, 6, 6));
+        Theme.RoundedCardPanel veggieCard = Theme.createTitledCard(null, "Garden Veggies & Cheese", false);
+        JPanel veggieBody = veggieCard.getContentPane();
+        veggieBody.setLayout(new GridLayout(MenuCatalog.VEGGIE_TOPPINGS.size(), 1, 0, 6));
         for (MenuOption v : MenuCatalog.VEGGIE_TOPPINGS) {
-            veggieCard.add(createToppingPill(v));
+            veggieBody.add(createToppingRow(v, Theme.BORDER_EMERALD, Theme.BG_EMERALD_TINT));
         }
 
-        Theme.RoundedCardPanel meatCard = Theme.createCardPanel("Savory Meats");
-        meatCard.setLayout(new GridLayout(3, 2, 6, 6));
+        Theme.RoundedCardPanel meatCard = Theme.createTitledCard(null, "Savory Meats", false);
+        JPanel meatBody = meatCard.getContentPane();
+        meatBody.setLayout(new GridLayout(MenuCatalog.MEAT_TOPPINGS.size(), 1, 0, 6));
         for (MenuOption m : MenuCatalog.MEAT_TOPPINGS) {
-            meatCard.add(createToppingPill(m));
+            meatBody.add(createToppingRow(m, Theme.STATUS_ERROR, Theme.BG_DANGER));
         }
 
         toppingSplit.add(veggieCard);
         toppingSplit.add(meatCard);
-        card.add(toppingSplit);
-        card.add(Box.createVerticalStrut(12));
+        content.add(toppingSplit);
+        content.add(Box.createVerticalStrut(14));
 
         // Pizza Add Action Row
         JPanel actionBar = new JPanel(new BorderLayout());
@@ -291,50 +284,39 @@ public class MenuOrderPanel extends JPanel {
         addPizzaBtn.addActionListener(e -> saveCurrentPizzaToCart());
         actionBar.add(livePizzaPriceLabel, BorderLayout.WEST);
         actionBar.add(addPizzaBtn, BorderLayout.EAST);
-        card.add(actionBar);
+        content.add(actionBar);
 
         return card;
     }
 
     /**
-     * Creates a single toggleable topping pill button bound to the 4-topping cap rule.
+     * Creates a styled horizontal {@link Theme.MenuRowToggle} for a pizza topping.
      *
-     * @param option topping {@link MenuOption}
-     * @return styled {@link Theme.TogglePillButton}
+     * @param option            topping menu option
+     * @param activeBorderColor highlight border color when selected
+     * @param activeBgColor     highlight background tint when selected
+     * @return configured {@link Theme.MenuRowToggle}
      */
-    private Theme.TogglePillButton createToppingPill(MenuOption option) {
-        String label = String.format("<html><center>%s<br/><small>+$%.2f</small></center></html>",
-                option.getName(), option.getPrice());
-        Theme.TogglePillButton pill = new Theme.TogglePillButton(label, false);
-        pill.setActionCommand(option.getName());
-        pill.addActionListener(e -> handleToppingToggle(pill));
-        toppingPills.add(pill);
-        return pill;
+    private Theme.MenuRowToggle createToppingRow(MenuOption option, Color activeBorderColor, Color activeBgColor) {
+        String priceStr = String.format("+$%.2f", option.getPrice());
+        Theme.MenuRowToggle row = new Theme.MenuRowToggle(option.getName(), priceStr, activeBorderColor, activeBgColor);
+        row.addActionListener(e -> handleToppingToggle(row));
+        toppingRows.add(row);
+        return row;
     }
 
     /**
-     * Builds the Craft Beverages selector card supporting 6 drinks across 3 drink sizes.
+     * Builds the Craft Beverages card featuring 3 Drink Size pills and a 3x2 grid of one-click Drink Cards
+     * matching Figure 8 section "5. PAIR WITH REFRESHING DRINKS".
      *
-     * @return constructed beverage {@link JPanel}
+     * @return constructed beverage grid card {@link JPanel}
      */
-    private JPanel buildBeverageCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Step 2B • Craft Beverages (3 Sizes)");
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+    private JPanel buildBeverageGridCard() {
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Optional Add-Ons", "5. Pair With Refreshing Drinks (3 Sizes)", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
-        JPanel topRow = new JPanel(new BorderLayout(10, 0));
-        topRow.setOpaque(false);
-        Theme.styleComboBox(beverageCombo);
-        beverageCombo.addActionListener(e -> updateLiveBeveragePrice());
-
-        JPanel qtyPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        qtyPanel.setOpaque(false);
-        qtyPanel.add(Theme.createFieldLabel("QTY:"));
-        beverageQtySpinner.addChangeListener(e -> updateLiveBeveragePrice());
-        qtyPanel.add(beverageQtySpinner);
-
-        topRow.add(beverageCombo, BorderLayout.CENTER);
-        topRow.add(qtyPanel, BorderLayout.EAST);
-
+        // 3 Drink Sizes Row
         JPanel sizeRow = new JPanel(new GridLayout(1, 3, 8, 0));
         sizeRow.setOpaque(false);
         ButtonGroup bevGroup = new ButtonGroup();
@@ -344,41 +326,67 @@ public class MenuOrderPanel extends JPanel {
             Theme.TogglePillButton pill = new Theme.TogglePillButton(sz.getName() + " (" + tag + ")", i == 0);
             pill.addActionListener(e -> {
                 selectedBeverageSize = sz;
-                updateLiveBeveragePrice();
+                updateDrinkCardPrices();
             });
             bevGroup.add(pill);
             beverageSizePills.add(pill);
             sizeRow.add(pill);
         }
 
-        JPanel bottom = new JPanel(new BorderLayout());
-        bottom.setOpaque(false);
-        liveBeveragePriceLabel.setFont(Theme.FONT_MONO_BOLD);
-        liveBeveragePriceLabel.setForeground(Theme.ACCENT_AMBER);
+        // 3x2 Grid of 6 Craft Drink Cards
+        JPanel drinksGrid = new JPanel(new GridLayout(2, 3, 10, 10));
+        drinksGrid.setOpaque(false);
+        for (MenuOption bev : MenuCatalog.BEVERAGES) {
+            Theme.RoundedCardPanel drinkCard = Theme.createCardPanel(null);
+            drinkCard.setLayout(new BorderLayout(4, 8));
 
-        JButton addBevBtn = Theme.createSecondaryButton("+ Add Drink to Order");
-        addBevBtn.addActionListener(e -> addCurrentBeverageToCart());
+            JPanel textStack = new JPanel();
+            textStack.setLayout(new BoxLayout(textStack, BoxLayout.Y_AXIS));
+            textStack.setOpaque(false);
+            JLabel nameLbl = new JLabel("<html><body style='width:165px'><b>" + bev.getName() + "</b></body></html>");
+            nameLbl.setFont(Theme.FONT_BODY);
+            nameLbl.setForeground(Theme.TEXT_PRIMARY);
+            JLabel descLbl = new JLabel(bev.getDescription());
+            descLbl.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
+            descLbl.setForeground(Theme.TEXT_MUTED);
+            textStack.add(nameLbl);
+            textStack.add(Box.createVerticalStrut(2));
+            textStack.add(descLbl);
 
-        bottom.add(liveBeveragePriceLabel, BorderLayout.WEST);
-        bottom.add(addBevBtn, BorderLayout.EAST);
+            JPanel bottomRow = new JPanel(new BorderLayout());
+            bottomRow.setOpaque(false);
+            JLabel priceLbl = new JLabel(Theme.formatCurrency(bev.getPrice()));
+            priceLbl.setFont(Theme.FONT_MONO_BOLD);
+            priceLbl.setForeground(Theme.ACCENT_AMBER);
+            drinkCardPriceLabels.add(priceLbl);
 
-        card.add(topRow);
-        card.add(Box.createVerticalStrut(8));
-        card.add(sizeRow);
-        card.add(Box.createVerticalStrut(10));
-        card.add(bottom);
+            JButton addBtn = Theme.createSecondaryButton("+ ADD");
+            addBtn.addActionListener(e -> addDrinkByOption(bev));
+
+            bottomRow.add(priceLbl, BorderLayout.WEST);
+            bottomRow.add(addBtn, BorderLayout.EAST);
+
+            drinkCard.add(textStack, BorderLayout.CENTER);
+            drinkCard.add(bottomRow, BorderLayout.SOUTH);
+            drinksGrid.add(drinkCard);
+        }
+
+        content.add(sizeRow);
+        content.add(Box.createVerticalStrut(10));
+        content.add(drinksGrid);
         return card;
     }
 
     /**
-     * Builds the right-hand Order Cart card with custom item cards and live totals.
+     * Builds the right-hand Order Cart card with custom-rendered item cards and live totals.
      *
      * @return constructed cart {@link JPanel}
      */
     private JPanel buildCartCard() {
-        Theme.RoundedCardPanel card = Theme.createAmberCardPanel("Order Cart");
-        card.setPreferredSize(new java.awt.Dimension(385, 0));
-        card.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Live Ticket", "Order Cart", true);
+        card.setPreferredSize(new Dimension(380, 0));
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
         cartList.setBackground(Theme.BG_INPUT);
         cartList.setCellRenderer(new CartItemCellRenderer());
@@ -432,27 +440,27 @@ public class MenuOrderPanel extends JPanel {
         southContainer.add(summaryPanel);
         southContainer.add(navActions);
 
-        card.add(scroll, BorderLayout.CENTER);
-        card.add(southContainer, BorderLayout.SOUTH);
+        content.add(scroll, BorderLayout.CENTER);
+        content.add(southContainer, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Enforces the strict maximum of 4 toppings per pizza whenever a topping pill is toggled.
+     * Enforces the strict maximum of 4 toppings per pizza whenever a topping row is toggled.
      *
-     * @param source clicked topping toggle pill
+     * @param source clicked topping toggle row
      */
-    private void handleToppingToggle(Theme.TogglePillButton source) {
+    private void handleToppingToggle(Theme.MenuRowToggle source) {
         int count = countSelectedToppings();
         if (count > MenuCatalog.MAX_TOPPINGS_PER_PIZZA) {
             source.setSelected(false);
             count = countSelectedToppings();
             toppingCounterLabel.setForeground(Theme.STATUS_ERROR);
-            toppingCounterLabel.setText("LIMIT: Max " + MenuCatalog.MAX_TOPPINGS_PER_PIZZA + " toppings!");
+            toppingCounterLabel.setText("LIMIT REACHED: Max " + MenuCatalog.MAX_TOPPINGS_PER_PIZZA + " toppings!");
             JOptionPane.showMessageDialog(
                     this,
                     "A maximum of " + MenuCatalog.MAX_TOPPINGS_PER_PIZZA + " toppings is allowed per pizza.\n"
-                            + "Deselect a topping first before adding another.",
+                            + "Deselect an existing topping first before adding another.",
                     "Maximum 4 Toppings Enforced",
                     JOptionPane.WARNING_MESSAGE
             );
@@ -466,12 +474,12 @@ public class MenuOrderPanel extends JPanel {
     /**
      * Counts selected toppings.
      *
-     * @return count of selected topping pills
+     * @return count of selected topping rows
      */
     private int countSelectedToppings() {
         int count = 0;
-        for (Theme.TogglePillButton pill : toppingPills) {
-            if (pill.isSelected()) {
+        for (Theme.MenuRowToggle row : toppingRows) {
+            if (row.isSelected()) {
                 count++;
             }
         }
@@ -486,27 +494,15 @@ public class MenuOrderPanel extends JPanel {
     public double computeCurrentPizzaPrice() {
         double price = (selectedSize != null ? selectedSize.getPrice() : 0.0)
                 + (selectedCrust != null ? selectedCrust.getPrice() : 0.0);
-        for (Theme.TogglePillButton pill : toppingPills) {
-            if (pill.isSelected()) {
-                MenuOption top = MenuCatalog.findToppingByName(pill.getActionCommand());
+        for (Theme.MenuRowToggle row : toppingRows) {
+            if (row.isSelected()) {
+                MenuOption top = MenuCatalog.findToppingByName(row.getActionCommand());
                 if (top != null) {
                     price += top.getPrice();
                 }
             }
         }
         return MenuCatalog.round2(price);
-    }
-
-    /**
-     * Computes the unit price of the currently selected beverage and size.
-     *
-     * @return computed unit price in USD
-     */
-    public double computeCurrentBeverageUnitPrice() {
-        MenuOption bev = (MenuOption) beverageCombo.getSelectedItem();
-        double unit = (bev != null ? bev.getPrice() : 0.0)
-                + (selectedBeverageSize != null ? selectedBeverageSize.getPrice() : 0.0);
-        return MenuCatalog.round2(unit);
     }
 
     /**
@@ -517,13 +513,14 @@ public class MenuOrderPanel extends JPanel {
     }
 
     /**
-     * Updates the live beverage total label.
+     * Updates the displayed price on all 6 drink cards when the user switches beverage size (S / M / L).
      */
-    private void updateLiveBeveragePrice() {
-        double unit = computeCurrentBeverageUnitPrice();
-        int qty = ((Number) beverageQtySpinner.getValue()).intValue();
-        double total = MenuCatalog.round2(unit * qty);
-        liveBeveragePriceLabel.setText(String.format("Drink Total: $%.2f ($%.2f ea)", total, unit));
+    private void updateDrinkCardPrices() {
+        double sizeUpcharge = selectedBeverageSize != null ? selectedBeverageSize.getPrice() : 0.0;
+        for (int i = 0; i < MenuCatalog.BEVERAGES.size() && i < drinkCardPriceLabels.size(); i++) {
+            double total = MenuCatalog.round2(MenuCatalog.BEVERAGES.get(i).getPrice() + sizeUpcharge);
+            drinkCardPriceLabels.get(i).setText("+" + Theme.formatCurrency(total));
+        }
     }
 
     /**
@@ -531,9 +528,9 @@ public class MenuOrderPanel extends JPanel {
      */
     private void saveCurrentPizzaToCart() {
         List<String> selectedToppings = new ArrayList<>();
-        for (Theme.TogglePillButton pill : toppingPills) {
-            if (pill.isSelected()) {
-                selectedToppings.add(pill.getActionCommand());
+        for (Theme.MenuRowToggle row : toppingRows) {
+            if (row.isSelected()) {
+                selectedToppings.add(row.getActionCommand());
             }
         }
         if (selectedToppings.size() > MenuCatalog.MAX_TOPPINGS_PER_PIZZA) {
@@ -554,7 +551,7 @@ public class MenuOrderPanel extends JPanel {
             cartItems.set(editingCartIndex, pizzaItem);
             cartListModel.set(editingCartIndex, pizzaItem);
             editingCartIndex = -1;
-            addPizzaBtn.setText("+ Add Pizza to Order");
+            addPizzaBtn.setText("ADD TO ORDER");
         } else {
             cartItems.add(pizzaItem);
             cartListModel.addElement(pizzaItem);
@@ -564,22 +561,30 @@ public class MenuOrderPanel extends JPanel {
     }
 
     /**
-     * Adds the configured beverage and quantity into the cart.
+     * Adds one unit of the clicked beverage using the active beverage size (S / M / L) into the cart,
+     * incrementing quantity if the exact beverage and size already exist in the cart.
+     *
+     * @param bev clicked beverage {@link MenuOption}
      */
-    private void addCurrentBeverageToCart() {
-        MenuOption bev = (MenuOption) beverageCombo.getSelectedItem();
-        int qty = ((Number) beverageQtySpinner.getValue()).intValue();
-        double unit = computeCurrentBeverageUnitPrice();
+    private void addDrinkByOption(MenuOption bev) {
+        double unit = MenuCatalog.round2(bev.getPrice() + (selectedBeverageSize != null ? selectedBeverageSize.getPrice() : 0.0));
+        String sizeName = selectedBeverageSize != null ? selectedBeverageSize.getName() : "Small (12 oz)";
 
-        OrderItem bevItem = OrderItem.createBeverage(
-                bev != null ? bev.getName() : "Beverage",
-                selectedBeverageSize.getName(),
-                unit,
-                qty
-        );
+        for (int i = 0; i < cartItems.size(); i++) {
+            OrderItem existing = cartItems.get(i);
+            if (!existing.isPizza()
+                    && existing.getBeverageName().equals(bev.getName())
+                    && existing.getBeverageSize().equals(sizeName)) {
+                existing.setQuantity(existing.getQuantity() + 1);
+                cartListModel.set(i, existing);
+                refreshCartSummary();
+                return;
+            }
+        }
+
+        OrderItem bevItem = OrderItem.createBeverage(bev.getName(), sizeName, unit, 1);
         cartItems.add(bevItem);
         cartListModel.addElement(bevItem);
-        beverageQtySpinner.setValue(1);
         refreshCartSummary();
     }
 
@@ -608,12 +613,12 @@ public class MenuOrderPanel extends JPanel {
         }
         OrderItem item = cartItems.get(idx);
         if (!item.isPizza()) {
-            JOptionPane.showMessageDialog(this, "Only custom pizzas can be loaded into the builder. Use Remove to change beverages.", "Beverage Item", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Only custom pizzas can be loaded into the builder. Use Remove to adjust drinks.", "Beverage Item", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
         editingCartIndex = idx;
-        addPizzaBtn.setText("Update Pizza in Order");
+        addPizzaBtn.setText("UPDATE PIZZA IN ORDER");
 
         for (int i = 0; i < sizePills.size(); i++) {
             if (sizePills.get(i).getActionCommand().equals(item.getSizeLabel())) {
@@ -633,8 +638,8 @@ public class MenuOrderPanel extends JPanel {
                 selectedSauce = MenuCatalog.SAUCE_LEVELS.get(i);
             }
         }
-        for (Theme.TogglePillButton pill : toppingPills) {
-            pill.setSelected(item.getToppings().contains(pill.getActionCommand()));
+        for (Theme.MenuRowToggle row : toppingRows) {
+            row.setSelected(item.getToppings().contains(row.getActionCommand()));
         }
         int count = countSelectedToppings();
         toppingCounterLabel.setForeground(Theme.ACCENT_AMBER);
@@ -652,7 +657,7 @@ public class MenuOrderPanel extends JPanel {
             cartListModel.remove(idx);
             if (editingCartIndex == idx) {
                 editingCartIndex = -1;
-                addPizzaBtn.setText("+ Add Pizza to Order");
+                addPizzaBtn.setText("ADD TO ORDER");
             }
             refreshCartSummary();
         }
@@ -665,7 +670,7 @@ public class MenuOrderPanel extends JPanel {
         cartItems.clear();
         cartListModel.clear();
         editingCartIndex = -1;
-        addPizzaBtn.setText("+ Add Pizza to Order");
+        addPizzaBtn.setText("ADD TO ORDER");
         refreshCartSummary();
     }
 
@@ -680,11 +685,11 @@ public class MenuOrderPanel extends JPanel {
         saucePills.get(1).setSelected(true);
         selectedSauce = MenuCatalog.SAUCE_LEVELS.get(1);
 
-        for (Theme.TogglePillButton pill : toppingPills) {
-            pill.setSelected(false);
+        for (Theme.MenuRowToggle row : toppingRows) {
+            row.setSelected(false);
         }
         toppingCounterLabel.setForeground(Theme.ACCENT_AMBER);
-        toppingCounterLabel.setText("Selected Toppings: 0 / 4 (Maximum 4 toppings per pizza)");
+        toppingCounterLabel.setText("Selected Toppings: 0 / 4 (Max 4)");
         updateLivePizzaPrice();
     }
 
@@ -762,7 +767,7 @@ public class MenuOrderPanel extends JPanel {
     }
 
     /**
-     * Custom cell renderer displaying each {@link OrderItem} in the cart as a dark-bordered card.
+     * Custom cell renderer displaying each {@link OrderItem} in the cart as a sleek rounded item card.
      */
     private static class CartItemCellRenderer implements ListCellRenderer<OrderItem> {
 
@@ -785,14 +790,15 @@ public class MenuOrderPanel extends JPanel {
         @Override
         public Component getListCellRendererComponent(JList<? extends OrderItem> list, OrderItem value,
                                                       int index, boolean isSelected, boolean cellHasFocus) {
-            JPanel card = new JPanel(new BorderLayout(4, 3));
+            JPanel card = new JPanel(new BorderLayout(4, 4));
             card.setBackground(isSelected ? new ColorHighlight() : Theme.BG_CARD);
             card.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_SUBTLE),
-                    BorderFactory.createEmptyBorder(8, 10, 8, 10)
+                    BorderFactory.createEmptyBorder(10, 12, 10, 12)
             ));
 
-            String titleText = String.format("#%d  %s", index + 1, value.isPizza() ? value.getSizeLabel() + " Pizza" : value.getQuantity() + "x " + value.getBeverageName());
+            String titleText = String.format("#%d: %s", index + 1,
+                    value.isPizza() ? value.getSizeLabel() : value.getQuantity() + "x " + value.getBeverageName());
             JLabel title = new JLabel(titleText);
             title.setFont(Theme.FONT_SUBTITLE);
             title.setForeground(Theme.TEXT_PRIMARY);
@@ -806,8 +812,8 @@ public class MenuOrderPanel extends JPanel {
             top.add(title, BorderLayout.WEST);
             top.add(price, BorderLayout.EAST);
 
-            JLabel details = new JLabel("<html><body style='width:310px'>" + value.getDisplayDetails() + "</body></html>");
-            details.setFont(Theme.FONT_BODY);
+            JLabel details = new JLabel("<html><body style='width:240px'>" + value.getDisplayDetails() + "</body></html>");
+            details.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
             details.setForeground(Theme.TEXT_MUTED);
 
             card.add(top, BorderLayout.NORTH);
@@ -818,7 +824,7 @@ public class MenuOrderPanel extends JPanel {
         /**
          * Warm highlight background color for selected cart items.
          */
-        private static class ColorHighlight extends java.awt.Color {
+        private static class ColorHighlight extends Color {
             /** Serial version UID. */
             private static final long serialVersionUID = 1L;
 

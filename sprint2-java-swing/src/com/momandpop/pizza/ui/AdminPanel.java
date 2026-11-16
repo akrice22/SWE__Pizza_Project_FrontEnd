@@ -8,7 +8,6 @@ import com.momandpop.pizza.storage.DataStore;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -21,6 +20,7 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.print.PrinterException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -95,8 +95,8 @@ public class AdminPanel extends JPanel {
     /** Input field for enrolling a new staff full name. */
     private final JTextField newStaffNameField;
 
-    /** Role selector for enrolling a new staff member. */
-    private final JComboBox<String> newStaffRoleCombo;
+    /** Selected role when enrolling a new staff account. */
+    private String selectedNewStaffRole;
 
     /** Controls whether passwords in the staff table are masked or visible. */
     private boolean showStaffPasswords;
@@ -112,6 +112,7 @@ public class AdminPanel extends JPanel {
         this.frame = frame;
         this.tabCardLayout = new CardLayout();
         this.tabContentPanel = new JPanel(tabCardLayout);
+        this.selectedNewStaffRole = "worker";
         this.showStaffPasswords = false;
 
         this.ordersModel = new DefaultTableModel(
@@ -152,7 +153,6 @@ public class AdminPanel extends JPanel {
         this.newStaffUserField = Theme.createTextField(10);
         this.newStaffPassField = Theme.createTextField(10);
         this.newStaffNameField = Theme.createTextField(14);
-        this.newStaffRoleCombo = new JComboBox<>(new String[]{"worker", "manager", "owner"});
 
         buildLayout();
         refreshAllTables();
@@ -164,7 +164,7 @@ public class AdminPanel extends JPanel {
     private void buildLayout() {
         setLayout(new BorderLayout(12, 14));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
+        setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
 
         // Top Header Card
         Theme.RoundedCardPanel header = Theme.createAmberCardPanel(null);
@@ -244,12 +244,14 @@ public class AdminPanel extends JPanel {
      * @return constructed orders tab {@link JPanel}
      */
     private JPanel buildOrdersTab() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("All Store Transactions (data/orders.txt)");
-        p.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel p = Theme.createTitledCard("Transaction Ledger", "All Store Orders (data/orders.txt)", false);
+        JPanel content = p.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
         Theme.styleTable(ordersTable);
+        configureColumnWidths(ordersTable, new int[]{58, 145, 105, 100, 78, 72, 72, 62, 62, 72, 290});
         JScrollPane scroll = new JScrollPane(ordersTable);
         Theme.styleScrollPane(scroll);
-        p.add(scroll, BorderLayout.CENTER);
+        content.add(scroll, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         bottom.setOpaque(false);
@@ -262,7 +264,7 @@ public class AdminPanel extends JPanel {
 
         bottom.add(viewSlipBtn);
         bottom.add(viewReceiptBtn);
-        p.add(bottom, BorderLayout.SOUTH);
+        content.add(bottom, BorderLayout.SOUTH);
         return p;
     }
 
@@ -272,12 +274,14 @@ public class AdminPanel extends JPanel {
      * @return constructed customers tab {@link JPanel}
      */
     private JPanel buildCustomersTab() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Registered Customers (data/customers.txt)");
-        p.setLayout(new BorderLayout());
+        Theme.RoundedCardPanel p = Theme.createTitledCard("Customer Master File", "Registered Customers (data/customers.txt)", false);
+        JPanel content = p.getContentPane();
+        content.setLayout(new BorderLayout());
         Theme.styleTable(customersTable);
+        configureColumnWidths(customersTable, new int[]{52, 120, 115, 95, 85, 220, 175, 175});
         JScrollPane scroll = new JScrollPane(customersTable);
         Theme.styleScrollPane(scroll);
-        p.add(scroll, BorderLayout.CENTER);
+        content.add(scroll, BorderLayout.CENTER);
         return p;
     }
 
@@ -287,38 +291,52 @@ public class AdminPanel extends JPanel {
      * @return constructed staff tab {@link JPanel}
      */
     private JPanel buildStaffTab() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Staff Accounts & Enrollment (data/staff.txt)");
-        p.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel p = Theme.createTitledCard("Team Access", "Staff Accounts & Enrollment (data/staff.txt)", false);
+        JPanel content = p.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
         Theme.styleTable(staffTable);
+        configureColumnWidths(staffTable, new int[]{52, 95, 100, 130, 85, 110, 210, 100, 85});
         JScrollPane scroll = new JScrollPane(staffTable);
         Theme.styleScrollPane(scroll);
-        p.add(scroll, BorderLayout.CENTER);
+        content.add(scroll, BorderLayout.CENTER);
 
-        Theme.RoundedCardPanel enrollBar = Theme.createCardPanel("Enroll New Staff Account");
-        enrollBar.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        Theme.styleComboBox(newStaffRoleCombo);
+        Theme.RoundedCardPanel enrollBar = Theme.createTitledCard(null, "Enroll New Staff Member", false);
+        JPanel barContent = enrollBar.getContentPane();
+        barContent.setLayout(new BorderLayout(10, 8));
 
-        enrollBar.add(Theme.createFieldLabel("USER:"));
-        enrollBar.add(newStaffUserField);
-        enrollBar.add(Theme.createFieldLabel("PASS:"));
-        enrollBar.add(newStaffPassField);
-        enrollBar.add(Theme.createFieldLabel("NAME:"));
-        enrollBar.add(newStaffNameField);
-        enrollBar.add(Theme.createFieldLabel("ROLE:"));
-        enrollBar.add(newStaffRoleCombo);
+        JPanel inputsRow = new JPanel(new GridLayout(1, 4, 10, 0));
+        inputsRow.setOpaque(false);
+        inputsRow.add(Theme.createStackedInput("USERNAME", newStaffUserField));
+        inputsRow.add(Theme.createStackedInput("PASSWORD", newStaffPassField));
+        inputsRow.add(Theme.createStackedInput("FULL NAME", newStaffNameField));
 
-        JButton addStaffBtn = Theme.createPrimaryButton("+ Enroll Staff");
-        addStaffBtn.addActionListener(e -> enrollStaffMember());
-        enrollBar.add(addStaffBtn);
+        JPanel rolePills = new JPanel(new GridLayout(1, 3, 4, 0));
+        rolePills.setOpaque(false);
+        ButtonGroup roleGroup = new ButtonGroup();
+        for (String r : new String[]{"worker", "manager", "owner"}) {
+            Theme.TogglePillButton pill = new Theme.TogglePillButton(r.toUpperCase(), "worker".equals(r));
+            pill.addActionListener(e -> selectedNewStaffRole = r);
+            roleGroup.add(pill);
+            rolePills.add(pill);
+        }
+        inputsRow.add(Theme.createStackedInput("ROLE", rolePills));
 
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        btnRow.setOpaque(false);
         JButton togglePassBtn = Theme.createSecondaryButton("👁 Show / Hide Passwords");
         togglePassBtn.addActionListener(e -> {
             showStaffPasswords = !showStaffPasswords;
             refreshAllTables();
         });
-        enrollBar.add(togglePassBtn);
+        JButton addStaffBtn = Theme.createPrimaryButton("+ Enroll Staff");
+        addStaffBtn.addActionListener(e -> enrollStaffMember());
+        btnRow.add(togglePassBtn);
+        btnRow.add(addStaffBtn);
 
-        p.add(enrollBar, BorderLayout.SOUTH);
+        barContent.add(inputsRow, BorderLayout.CENTER);
+        barContent.add(btnRow, BorderLayout.SOUTH);
+
+        content.add(enrollBar, BorderLayout.SOUTH);
         return p;
     }
 
@@ -328,8 +346,9 @@ public class AdminPanel extends JPanel {
      * @return constructed summary report tab {@link JPanel}
      */
     private JPanel buildSummaryTab() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Daily Business Summary Report for Management");
-        p.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel p = Theme.createTitledCard("Management Reporting", "Daily Business Summary Report", false);
+        JPanel content = p.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
         dailySummaryArea.setEditable(false);
         dailySummaryArea.setBackground(Theme.RECEIPT_PAPER);
@@ -339,7 +358,7 @@ public class AdminPanel extends JPanel {
 
         JScrollPane scroll = new JScrollPane(dailySummaryArea);
         Theme.styleScrollPane(scroll);
-        p.add(scroll, BorderLayout.CENTER);
+        content.add(scroll, BorderLayout.CENTER);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
@@ -352,7 +371,7 @@ public class AdminPanel extends JPanel {
 
         actions.add(saveBtn);
         actions.add(printBtn);
-        p.add(actions, BorderLayout.SOUTH);
+        content.add(actions, BorderLayout.SOUTH);
         return p;
     }
 
@@ -484,14 +503,13 @@ public class AdminPanel extends JPanel {
         String user = newStaffUserField.getText().trim().toLowerCase();
         String pass = newStaffPassField.getText().trim();
         String name = newStaffNameField.getText().trim();
-        String role = String.valueOf(newStaffRoleCombo.getSelectedItem());
 
         if (user.isEmpty() || pass.isEmpty() || name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Enter username, password, and full name.", "Missing Fields", JOptionPane.WARNING_MESSAGE);
             return;
         }
         try {
-            StaffUser newUser = new StaffUser(0, user, pass, name, role, "555-000-0000",
+            StaffUser newUser = new StaffUser(0, user, pass, name, selectedNewStaffRole, "555-000-0000",
                     user + "@momandpoppizza.com", LocalDate.now().toString(), true);
             dataStore.saveStaffUser(newUser);
             newStaffUserField.setText("");
@@ -501,6 +519,18 @@ public class AdminPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Enrolled staff account '" + user + "' into data/staff.txt.", "Staff Enrolled", JOptionPane.INFORMATION_MESSAGE);
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Duplicate Username", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Applies balanced preferred widths to a {@link JTable} column model so timestamps and descriptions remain readable.
+     *
+     * @param table  target {@link JTable}
+     * @param widths array of preferred widths matching column indices
+     */
+    private static void configureColumnWidths(JTable table, int[] widths) {
+        for (int i = 0; i < widths.length && i < table.getColumnModel().getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
         }
     }
 }

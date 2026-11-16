@@ -20,11 +20,9 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.GridLayout;
-import java.awt.Insets;
 import java.awt.print.PrinterException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -186,7 +184,7 @@ public class CheckoutReceiptPanel extends JPanel {
     private void buildLayout() {
         setLayout(new GridLayout(1, 2, 18, 0));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
+        setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
 
         add(buildPaymentFormCard());
         add(buildReceiptCard());
@@ -198,8 +196,9 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return payment form {@link JPanel}
      */
     private JPanel buildPaymentFormCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Step 03 • Review & Pay");
-        card.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Step 03", "Review & Pay", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
@@ -214,6 +213,8 @@ public class CheckoutReceiptPanel extends JPanel {
 
         JPanel payRow = new JPanel(new GridLayout(1, 4, 8, 0));
         payRow.setOpaque(false);
+        payRow.setAlignmentX(LEFT_ALIGNMENT);
+        payRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         payRow.add(creditPill);
         payRow.add(debitPill);
         payRow.add(cashPill);
@@ -232,6 +233,8 @@ public class CheckoutReceiptPanel extends JPanel {
 
         // Dynamic Tender Details
         tenderPanel.setOpaque(false);
+        tenderPanel.setAlignmentX(LEFT_ALIGNMENT);
+        tenderPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 190));
         tenderPanel.add(buildCardSubPanel(), "CARD");
         tenderPanel.add(buildCashSubPanel(), "CASH");
         tenderPanel.add(buildCheckSubPanel(), "CHECK");
@@ -247,6 +250,8 @@ public class CheckoutReceiptPanel extends JPanel {
 
         JPanel tipPillsRow = new JPanel(new GridLayout(1, 5, 6, 0));
         tipPillsRow.setOpaque(false);
+        tipPillsRow.setAlignmentX(LEFT_ALIGNMENT);
+        tipPillsRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
         tipPillsRow.add(tip0Pill);
         tipPillsRow.add(tip15Pill);
         tipPillsRow.add(tip18Pill);
@@ -255,12 +260,14 @@ public class CheckoutReceiptPanel extends JPanel {
 
         JPanel customTipBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         customTipBar.setOpaque(false);
+        customTipBar.setAlignmentX(LEFT_ALIGNMENT);
+        customTipBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
         customTipBar.add(Theme.createFieldLabel("CUSTOM TIP ($):"));
         customTipField.setText("0.00");
         customTipField.setEnabled(false);
         customTipBar.add(customTipField);
 
-        JButton applyTipBtn = Theme.createSecondaryButton("Recalculate Totals");
+        JButton applyTipBtn = Theme.createSecondaryButton("Recalculate");
         applyTipBtn.addActionListener(e -> refreshFinancialSummary());
         customTipBar.add(applyTipBtn);
 
@@ -286,114 +293,107 @@ public class CheckoutReceiptPanel extends JPanel {
         });
 
         // Totals Summary Box
-        Theme.RoundedCardPanel totalsCard = Theme.createAmberCardPanel("Financial Breakdown");
-        totalsCard.setLayout(new FlowLayout(FlowLayout.LEFT));
+        Theme.RoundedCardPanel totalsCard = Theme.createTitledCard(null, "Financial Breakdown", true);
+        totalsCard.setAlignmentX(LEFT_ALIGNMENT);
+        totalsCard.setMinimumSize(new Dimension(280, 108));
+        totalsCard.setPreferredSize(new Dimension(480, 112));
+        totalsCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 122));
+        JPanel totalsBody = totalsCard.getContentPane();
+        totalsBody.setLayout(new BorderLayout());
         breakdownLabel.setFont(Theme.FONT_MONO);
         breakdownLabel.setForeground(Theme.TEXT_PRIMARY);
-        totalsCard.add(breakdownLabel);
+        breakdownLabel.setText("<html>Subtotal: <b>$0.00</b> &nbsp;|&nbsp; Delivery: <b>$3.99</b> &nbsp;|&nbsp; Tax (8%): <b>$0.00</b><br/>Tip: <b>$0.00</b> &nbsp;|&nbsp; <font color='#FDE68A' size='+1'>TOTAL: $3.99</font></html>");
+        totalsBody.add(breakdownLabel, BorderLayout.CENTER);
 
         // Signature Block
-        Theme.RoundedCardPanel sigPanel = Theme.createCardPanel("Customer Digital Signature");
-        sigPanel.setLayout(new BorderLayout(6, 6));
+        Theme.RoundedCardPanel sigPanel = Theme.createTitledCard(null, "Customer Digital Signature", false);
+        sigPanel.setAlignmentX(LEFT_ALIGNMENT);
+        sigPanel.setMinimumSize(new Dimension(280, 215));
+        sigPanel.setPreferredSize(new Dimension(480, 228));
+        JPanel sigBody = sigPanel.getContentPane();
+        sigBody.setLayout(new BorderLayout(6, 6));
 
-        JPanel typedRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        JPanel typedRow = new JPanel(new BorderLayout(8, 0));
         typedRow.setOpaque(false);
-        typedRow.add(Theme.createFieldLabel("TYPED NAME:"));
-        typedRow.add(typedSignatureField);
-        JButton clearSigBtn = Theme.createSecondaryButton("Clear Canvas");
+        typedRow.add(Theme.createStackedInput("TYPED LEGAL SIGNATURE", typedSignatureField), BorderLayout.CENTER);
+        JButton clearSigBtn = Theme.createSecondaryButton("Clear Pad");
         clearSigBtn.addActionListener(e -> signatureCanvas.clearSignature());
-        typedRow.add(clearSigBtn);
+        typedRow.add(clearSigBtn, BorderLayout.EAST);
 
         authorizeCheck.setOpaque(false);
         authorizeCheck.setForeground(Theme.TEXT_PRIMARY);
         authorizeCheck.setFont(Theme.FONT_BODY);
 
-        sigPanel.add(typedRow, BorderLayout.NORTH);
-        sigPanel.add(signatureCanvas, BorderLayout.CENTER);
-        sigPanel.add(authorizeCheck, BorderLayout.SOUTH);
+        sigBody.add(typedRow, BorderLayout.NORTH);
+        sigBody.add(signatureCanvas, BorderLayout.CENTER);
+        sigBody.add(authorizeCheck, BorderLayout.SOUTH);
 
         body.add(payRow);
-        body.add(Box.createVerticalStrut(8));
+        body.add(Box.createVerticalStrut(10));
         body.add(tenderPanel);
-        body.add(Box.createVerticalStrut(8));
+        body.add(Box.createVerticalStrut(10));
         body.add(tipPillsRow);
         body.add(Box.createVerticalStrut(4));
         body.add(customTipBar);
-        body.add(Box.createVerticalStrut(6));
-        body.add(totalsCard);
         body.add(Box.createVerticalStrut(8));
+        body.add(totalsCard);
+        body.add(Box.createVerticalStrut(10));
         body.add(sigPanel);
 
         JScrollPane bodyScroll = new JScrollPane(body);
+        Theme.styleScrollPane(bodyScroll);
         bodyScroll.setBorder(null);
-        bodyScroll.getViewport().setBackground(Theme.BG_CARD);
-        bodyScroll.getVerticalScrollBar().setUnitIncrement(16);
 
         JPanel footer = new JPanel(new BorderLayout(8, 0));
         footer.setOpaque(false);
 
         JPanel leftFooter = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         leftFooter.setOpaque(false);
-        JButton backBtn = Theme.createSecondaryButton("← Back to Menu");
+        JButton backBtn = Theme.createSecondaryButton("← Menu");
         backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_MENU));
         JButton cancelBtn = Theme.createDangerButton("Cancel Order");
         cancelBtn.addActionListener(e -> frame.startFreshCustomerOrder());
         leftFooter.add(backBtn);
         leftFooter.add(cancelBtn);
 
-        JButton completeBtn = Theme.createPrimaryButton("AUTHORIZE & COMPLETE ORDER →");
+        JButton completeBtn = Theme.createPrimaryButton("AUTHORIZE & PAY →");
         completeBtn.addActionListener(e -> submitOrder());
 
         footer.add(leftFooter, BorderLayout.WEST);
         footer.add(completeBtn, BorderLayout.EAST);
 
-        card.add(bodyScroll, BorderLayout.CENTER);
-        card.add(footer, BorderLayout.SOUTH);
+        content.add(bodyScroll, BorderLayout.CENTER);
+        content.add(footer, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Builds Credit/Debit card details sub-panel.
+     * Builds Credit/Debit card details sub-panel with stacked rounded inputs.
      *
      * @return card input {@link JPanel}
      */
     private JPanel buildCardSubPanel() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Card Details");
-        p.setLayout(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(3, 4, 3, 6);
-        c.fill = GridBagConstraints.HORIZONTAL;
+        Theme.RoundedCardPanel p = Theme.createTitledCard(null, "Card Details", false);
+        JPanel body = p.getContentPane();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 
         cardNumberField.setText("4242 4242 4242 4242");
         cardExpiryField.setText("12/28");
         cardCvvField.setText("123");
 
-        c.gridy = 0;
-        c.gridx = 0;
-        p.add(Theme.createFieldLabel("CARDHOLDER"), c);
-        c.gridx = 1;
-        c.weightx = 1.0;
-        p.add(cardNameField, c);
+        JPanel row1 = new JPanel(new GridLayout(1, 2, 10, 0));
+        row1.setOpaque(false);
+        row1.add(Theme.createStackedInput("NAME ON CARD", cardNameField));
+        row1.add(Theme.createStackedInput("CARD NUMBER", cardNumberField));
 
-        c.gridy = 1;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        p.add(Theme.createFieldLabel("CARD NUMBER"), c);
-        c.gridx = 1;
-        c.weightx = 1.0;
-        p.add(cardNumberField, c);
+        JPanel row2 = new JPanel(new GridLayout(1, 2, 10, 0));
+        row2.setOpaque(false);
+        row2.add(Theme.createStackedInput("EXPIRATION (MM/YY)", cardExpiryField));
+        row2.add(Theme.createStackedInput("CVV / CVC", cardCvvField));
 
-        JPanel expCvv = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        expCvv.setOpaque(false);
-        expCvv.add(Theme.createFieldLabel("EXP:"));
-        expCvv.add(cardExpiryField);
-        expCvv.add(Theme.createFieldLabel("CVV:"));
-        expCvv.add(cardCvvField);
-
-        c.gridy = 2;
-        c.gridx = 0;
-        c.gridwidth = 2;
-        p.add(expCvv, c);
+        body.add(row1);
+        body.add(Box.createVerticalStrut(8));
+        body.add(row2);
         return p;
     }
 
@@ -403,19 +403,19 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return cash input {@link JPanel}
      */
     private JPanel buildCashSubPanel() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Cash Tender Details");
-        p.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 4));
-        p.add(Theme.createFieldLabel("AMOUNT TENDERED ($):"));
+        Theme.RoundedCardPanel p = Theme.createTitledCard(null, "Cash Tender Details", false);
+        JPanel body = p.getContentPane();
+        body.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 4));
         cashTenderedField.setText("50.00");
-        p.add(cashTenderedField);
+        body.add(Theme.createStackedInput("AMOUNT TENDERED ($)", cashTenderedField));
 
         JButton calcBtn = Theme.createSecondaryButton("Calc Change");
         calcBtn.addActionListener(e -> updateCashChangeLabel());
-        p.add(calcBtn);
+        body.add(calcBtn);
 
         cashChangeLabel.setFont(Theme.FONT_MONO_BOLD);
         cashChangeLabel.setForeground(Theme.STATUS_SUCCESS);
-        p.add(cashChangeLabel);
+        body.add(cashChangeLabel);
         return p;
     }
 
@@ -425,14 +425,13 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return check input {@link JPanel}
      */
     private JPanel buildCheckSubPanel() {
-        Theme.RoundedCardPanel p = Theme.createCardPanel("Physical Check Details");
-        p.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 4));
-        p.add(Theme.createFieldLabel("CHECK #:"));
+        Theme.RoundedCardPanel p = Theme.createTitledCard(null, "Physical Check Details", false);
+        JPanel body = p.getContentPane();
+        body.setLayout(new GridLayout(1, 2, 10, 0));
         checkNumberField.setText("1042");
-        p.add(checkNumberField);
-        p.add(Theme.createFieldLabel("CHECK AMOUNT ($):"));
         checkAmountField.setText("50.00");
-        p.add(checkAmountField);
+        body.add(Theme.createStackedInput("CHECK NUMBER", checkNumberField));
+        body.add(Theme.createStackedInput("CHECK AMOUNT ($)", checkAmountField));
         return p;
     }
 
@@ -442,10 +441,11 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return receipt viewer {@link JPanel}
      */
     private JPanel buildReceiptCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Order Reports (Receipt & Cook Slip)");
-        card.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Order Output", "Customer Receipt & Cook Slip", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
-        JPanel topBar = new JPanel(new BorderLayout(8, 6));
+        JPanel topBar = new JPanel(new BorderLayout(8, 8));
         topBar.setOpaque(false);
         receiptStatusLabel.setFont(Theme.FONT_LABEL);
         receiptStatusLabel.setForeground(Theme.ACCENT_AMBER);
@@ -466,14 +466,16 @@ public class CheckoutReceiptPanel extends JPanel {
         topBar.add(docSwitch, BorderLayout.SOUTH);
 
         receiptArea.setEditable(false);
+        receiptArea.setLineWrap(true);
+        receiptArea.setWrapStyleWord(true);
         receiptArea.setBackground(Theme.RECEIPT_PAPER);
         receiptArea.setForeground(Theme.RECEIPT_INK);
         receiptArea.setFont(Theme.FONT_MONO);
         receiptArea.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
-        receiptArea.setText("Authorize payment on the left to generate your official Customer Receipt & Cook Slip...");
+        receiptArea.setText("Authorize payment on the left to generate your official Customer Receipt & Cook Order Slip...");
 
         JScrollPane scroll = new JScrollPane(receiptArea);
-        scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_STONE, 1));
+        Theme.styleScrollPane(scroll);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
@@ -491,9 +493,9 @@ public class CheckoutReceiptPanel extends JPanel {
         actions.add(printBtn);
         actions.add(newOrderBtn);
 
-        card.add(topBar, BorderLayout.NORTH);
-        card.add(scroll, BorderLayout.CENTER);
-        card.add(actions, BorderLayout.SOUTH);
+        content.add(topBar, BorderLayout.NORTH);
+        content.add(scroll, BorderLayout.CENTER);
+        content.add(actions, BorderLayout.SOUTH);
         return card;
     }
 
@@ -537,6 +539,21 @@ public class CheckoutReceiptPanel extends JPanel {
                 totals[0], orderType, totals[1], totals[2], totals[3], acct, totals[4]
         ));
         updateCashChangeLabel();
+    }
+
+    /**
+     * Populates a sample receipt preview directly for headless rendering verification.
+     *
+     * @param sampleOrder completed sample {@link OrderRecord}
+     */
+    public void previewOrderRecord(OrderRecord sampleOrder) {
+        if (sampleOrder == null) {
+            return;
+        }
+        this.latestCompletedOrder = sampleOrder;
+        receiptStatusLabel.setForeground(Theme.STATUS_SUCCESS);
+        receiptStatusLabel.setText("● Payment Confirmed — Order #" + sampleOrder.getOrderId());
+        renderDisplayedReport();
     }
 
     /**

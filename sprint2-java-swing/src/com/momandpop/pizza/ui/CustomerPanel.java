@@ -9,9 +9,9 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -20,18 +20,16 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.GridLayout;
-import java.awt.Insets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * Step 1 screen handling 10-digit customer phone lookups from {@code data/customers.txt},
- * charge account selection (Visa/MasterCard), profile updates, past order quick reorder,
- * and fulfillment type selection (Delivery vs. Pickup).
+ * Step 1 screen matching Figures 6, 7A, and 7B: 10-digit customer phone lookup,
+ * charge account pill selectors (Visa/MasterCard), stacked delivery inputs, and past orders quick reorder.
  */
 public class CustomerPanel extends JPanel {
 
@@ -65,8 +63,11 @@ public class CustomerPanel extends JPanel {
     /** Nearest major intersection input field. */
     private final JTextField intersectionField;
 
-    /** Dropdown selecting customer's preferred charge account type. */
-    private final JComboBox<String> chargeAccountCombo;
+    /** Pill toggles selecting charge account type (Visa, MasterCard, Discover, Amex, None). */
+    private final List<Theme.TogglePillButton> chargePills;
+
+    /** Currently selected charge account type label. */
+    private String selectedChargeAccount;
 
     /** Toggle pill selecting delivery fulfillment ($3.99 fee). */
     private final Theme.TogglePillButton deliveryPill;
@@ -94,12 +95,13 @@ public class CustomerPanel extends JPanel {
         this.frame = frame;
         this.lookupPhoneField = Theme.createTextField(18);
         this.lookupStatusLabel = new JLabel("Enter a 10-digit phone number (e.g., 5555555555) to autofill saved details.");
-        this.nameField = Theme.createTextField(22);
+        this.nameField = Theme.createTextField(20);
         this.phoneField = Theme.createTextField(16);
         this.streetField = Theme.createTextField(26);
         this.subdivisionField = Theme.createTextField(18);
         this.intersectionField = Theme.createTextField(18);
-        this.chargeAccountCombo = new JComboBox<>(new String[]{"Visa", "MasterCard", "Discover", "Amex", "None (Cash/Check)"});
+        this.chargePills = new ArrayList<>();
+        this.selectedChargeAccount = "Visa";
         this.deliveryPill = new Theme.TogglePillButton("DELIVERY ($3.99 Fee)", true);
         this.pickupPill = new Theme.TogglePillButton("PICKUP (Free)", false);
         this.pastOrdersModel = new DefaultListModel<>();
@@ -110,35 +112,37 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Assembles the lookup bar, customer form inputs, and past orders history list.
+     * Assembles the lookup bar, stacked customer form card, and past orders history card.
      */
     private void buildLayout() {
         setLayout(new BorderLayout(16, 14));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
+        setBorder(BorderFactory.createEmptyBorder(18, 28, 18, 28));
 
         // Top Header & Quick Lookup Card
-        Theme.RoundedCardPanel lookupCard = Theme.createAmberCardPanel("Step 01 • Quick Lookup (Returning Customers)");
-        lookupCard.setLayout(new BorderLayout(10, 8));
+        Theme.RoundedCardPanel lookupCard = Theme.createTitledCard("Step 01", "⚡ Quick Lookup (Returning Customers)", true);
+        JPanel lookupBody = lookupCard.getContentPane();
+        lookupBody.setLayout(new BorderLayout(10, 8));
 
-        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel searchRow = new JPanel(new BorderLayout(10, 0));
         searchRow.setOpaque(false);
-        searchRow.add(Theme.createFieldLabel("PHONE NUMBER"));
-        searchRow.add(lookupPhoneField);
+        searchRow.add(lookupPhoneField, BorderLayout.CENTER);
 
+        JPanel searchBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        searchBtns.setOpaque(false);
         JButton findBtn = Theme.createPrimaryButton("Find My Info");
         findBtn.addActionListener(e -> performPhoneLookup(lookupPhoneField.getText()));
-        searchRow.add(findBtn);
-
-        JButton clearBtn = Theme.createSecondaryButton("Clear / New Customer");
+        JButton clearBtn = Theme.createSecondaryButton("Clear Form");
         clearBtn.addActionListener(e -> clearForm());
-        searchRow.add(clearBtn);
+        searchBtns.add(findBtn);
+        searchBtns.add(clearBtn);
+        searchRow.add(searchBtns, BorderLayout.EAST);
 
         lookupStatusLabel.setFont(Theme.FONT_BODY);
         lookupStatusLabel.setForeground(Theme.TEXT_MUTED);
 
-        lookupCard.add(searchRow, BorderLayout.CENTER);
-        lookupCard.add(lookupStatusLabel, BorderLayout.SOUTH);
+        lookupBody.add(searchRow, BorderLayout.CENTER);
+        lookupBody.add(lookupStatusLabel, BorderLayout.SOUTH);
 
         // Center split: Left = Form, Right = Past Orders
         JPanel centerSplit = new JPanel(new GridLayout(1, 2, 18, 0));
@@ -159,7 +163,7 @@ public class CustomerPanel extends JPanel {
         leftFooter.add(backBtn);
         leftFooter.add(updateOnlyBtn);
 
-        JButton saveContinueBtn = Theme.createPrimaryButton("SAVE DETAILS & BUILD CUSTOM PIZZA →");
+        JButton saveContinueBtn = Theme.createPrimaryButton("SAVE DETAILS & START CUSTOM ORDER →");
         saveContinueBtn.addActionListener(e -> saveAndProceed());
 
         footer.add(leftFooter, BorderLayout.WEST);
@@ -171,18 +175,16 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Builds the main customer contact, charge account, and delivery address card.
+     * Builds the stacked modern customer intake card matching Figure 6.
      *
      * @return constructed form {@link JPanel}
      */
     private JPanel buildCustomerFormCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Delivery & Customer Master Record");
-        card.setLayout(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(6, 4, 6, 8);
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.anchor = GridBagConstraints.WEST;
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Customer Master Record", "Delivery & Contact Info", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
+        // Fulfillment Pills
         ButtonGroup group = new ButtonGroup();
         group.add(deliveryPill);
         group.add(pickupPill);
@@ -191,20 +193,56 @@ public class CustomerPanel extends JPanel {
         typePanel.setOpaque(false);
         typePanel.add(deliveryPill);
         typePanel.add(pickupPill);
-
         deliveryPill.addActionListener(e -> updateAddressEnabledState());
         pickupPill.addActionListener(e -> updateAddressEnabledState());
-        Theme.styleComboBox(chargeAccountCombo);
+        JPanel typeStack = Theme.createStackedInput("ORDER FULFILLMENT", typePanel);
+        typeStack.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
 
-        int row = 0;
-        addFormRow(card, c, row++, "FULFILLMENT", typePanel);
-        addFormRow(card, c, row++, "FULL NAME *", nameField);
-        addFormRow(card, c, row++, "PHONE NUMBER *", phoneField);
-        addFormRow(card, c, row++, "CHARGE ACCOUNT", chargeAccountCombo);
-        addFormRow(card, c, row++, "STREET ADDRESS", streetField);
-        addFormRow(card, c, row++, "SUBDIVISION / APT", subdivisionField);
-        addFormRow(card, c, row, "NEAREST INTERSECTION", intersectionField);
+        // Name & Phone Row
+        JPanel namePhoneRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        namePhoneRow.setOpaque(false);
+        namePhoneRow.setAlignmentX(LEFT_ALIGNMENT);
+        namePhoneRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+        namePhoneRow.add(Theme.createStackedInput("FULL NAME *", nameField));
+        namePhoneRow.add(Theme.createStackedInput("PHONE NUMBER (10 DIGITS) *", phoneField));
 
+        // Charge Account Pills (Zero JComboBox)
+        String[] chargeOptions = {"Visa", "MasterCard", "Discover", "Amex", "None"};
+        JPanel chargeRow = new JPanel(new GridLayout(1, 5, 6, 0));
+        chargeRow.setOpaque(false);
+        ButtonGroup chargeGroup = new ButtonGroup();
+        for (int i = 0; i < chargeOptions.length; i++) {
+            String opt = chargeOptions[i];
+            Theme.TogglePillButton pill = new Theme.TogglePillButton(opt, i == 0);
+            pill.setActionCommand(opt);
+            pill.addActionListener(e -> selectedChargeAccount = opt);
+            chargeGroup.add(pill);
+            chargePills.add(pill);
+            chargeRow.add(pill);
+        }
+        JPanel chargeStack = Theme.createStackedInput("CHARGE ACCOUNT ON FILE", chargeRow);
+        chargeStack.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+
+        // Street Address
+        JPanel streetStack = Theme.createStackedInput("STREET ADDRESS", streetField);
+
+        // Subdivision & Intersection Row
+        JPanel subIntRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        subIntRow.setOpaque(false);
+        subIntRow.setAlignmentX(LEFT_ALIGNMENT);
+        subIntRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+        subIntRow.add(Theme.createStackedInput("SUBDIVISION / COMPLEX", subdivisionField));
+        subIntRow.add(Theme.createStackedInput("NEAREST MAJOR INTERSECTION", intersectionField));
+
+        content.add(typeStack);
+        content.add(Box.createVerticalStrut(10));
+        content.add(namePhoneRow);
+        content.add(Box.createVerticalStrut(10));
+        content.add(chargeStack);
+        content.add(Box.createVerticalStrut(10));
+        content.add(streetStack);
+        content.add(Box.createVerticalStrut(10));
+        content.add(subIntRow);
         return card;
     }
 
@@ -214,61 +252,41 @@ public class CustomerPanel extends JPanel {
      * @return constructed history card {@link JPanel}
      */
     private JPanel buildPastOrdersCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Past Favorites (Order History)");
-        card.setLayout(new BorderLayout(0, 10));
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Order History", "Past Favorites & Quick Re-Order", false);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BorderLayout(0, 10));
 
         historyList.setBackground(Theme.BG_INPUT);
         historyList.setForeground(Theme.TEXT_PRIMARY);
         historyList.setFont(Theme.FONT_MONO);
-        historyList.setFixedCellHeight(30);
+        historyList.setCellRenderer(new PastOrderCellRenderer());
         JScrollPane scroll = new JScrollPane(historyList);
         Theme.styleScrollPane(scroll);
 
-        JPanel south = new JPanel(new BorderLayout(0, 8));
+        JPanel south = new JPanel(new BorderLayout(0, 10));
         south.setOpaque(false);
 
-        JButton reorderBtn = Theme.createSecondaryButton("+ Re-Order Sample Medium Thin Pepperoni & Extra Cheese");
+        JButton reorderBtn = Theme.createSecondaryButton("+ Re-Order Medium Thin Pepperoni & Extra Cheese");
         reorderBtn.addActionListener(e -> reorderFavoritePizza());
 
-        JPanel tipBox = new JPanel();
+        Theme.RoundedCardPanel tipBox = Theme.createCardPanel(null);
         tipBox.setLayout(new BoxLayout(tipBox, BoxLayout.Y_AXIS));
-        tipBox.setOpaque(false);
-        JLabel tip1 = new JLabel("Sample Profiles in data/customers.txt:");
+        JLabel tip1 = new JLabel("SAMPLE PROFILES IN data/customers.txt");
         tip1.setFont(Theme.FONT_LABEL);
         tip1.setForeground(Theme.ACCENT_AMBER);
-        JLabel tip2 = new JLabel("• Jane Doe (Visa): 555-555-5555   • James Smith (MC): 124-183-7581");
+        JLabel tip2 = new JLabel("<html><body style='width:440px'>• Jane Doe (Visa): 555-555-5555 &nbsp;&nbsp;• James Smith (MC): 124-183-7581<br/>• Juan Gonzalez: 555-123-4567</body></html>");
         tip2.setFont(Theme.FONT_BODY);
         tip2.setForeground(Theme.TEXT_MUTED);
         tipBox.add(tip1);
-        tipBox.add(Box.createVerticalStrut(3));
+        tipBox.add(Box.createVerticalStrut(4));
         tipBox.add(tip2);
 
         south.add(reorderBtn, BorderLayout.NORTH);
         south.add(tipBox, BorderLayout.SOUTH);
 
-        card.add(scroll, BorderLayout.CENTER);
-        card.add(south, BorderLayout.SOUTH);
+        content.add(scroll, BorderLayout.CENTER);
+        content.add(south, BorderLayout.SOUTH);
         return card;
-    }
-
-    /**
-     * Helper to add a labeled input row inside a {@link GridBagLayout}.
-     *
-     * @param parent    target panel
-     * @param c         constraints object
-     * @param row       grid row index
-     * @param labelText field caption
-     * @param comp      input component
-     */
-    private void addFormRow(JPanel parent, GridBagConstraints c, int row, String labelText, Component comp) {
-        c.gridy = row;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        parent.add(Theme.createFieldLabel(labelText), c);
-
-        c.gridx = 1;
-        c.weightx = 1.0;
-        parent.add(comp, c);
     }
 
     /**
@@ -318,7 +336,7 @@ public class CustomerPanel extends JPanel {
         }
 
         lookupStatusLabel.setForeground(Theme.STATUS_SUCCESS);
-        lookupStatusLabel.setText("Welcome back, " + found.getName() + " (" + found.getChargeAccountType() + ")! Loaded " + loadedPastOrders.size() + " past order(s).");
+        lookupStatusLabel.setText("✓ Welcome back, " + found.getName() + " (" + found.getChargeAccountType() + ")! Loaded " + loadedPastOrders.size() + " past order(s).");
     }
 
     /**
@@ -343,16 +361,11 @@ public class CustomerPanel extends JPanel {
 
         String acct = c.getChargeAccountType();
         if (acct != null && !acct.isEmpty()) {
-            boolean matched = false;
-            for (int i = 0; i < chargeAccountCombo.getItemCount(); i++) {
-                if (chargeAccountCombo.getItemAt(i).equalsIgnoreCase(acct)) {
-                    chargeAccountCombo.setSelectedIndex(i);
-                    matched = true;
-                    break;
+            for (Theme.TogglePillButton pill : chargePills) {
+                if (pill.getActionCommand().equalsIgnoreCase(acct)) {
+                    pill.setSelected(true);
+                    selectedChargeAccount = pill.getActionCommand();
                 }
-            }
-            if (!matched) {
-                chargeAccountCombo.setSelectedIndex(chargeAccountCombo.getItemCount() - 1);
             }
         }
         updateAddressEnabledState();
@@ -368,7 +381,10 @@ public class CustomerPanel extends JPanel {
         streetField.setText("");
         subdivisionField.setText("");
         intersectionField.setText("");
-        chargeAccountCombo.setSelectedIndex(0);
+        if (!chargePills.isEmpty()) {
+            chargePills.get(0).setSelected(true);
+            selectedChargeAccount = chargePills.get(0).getActionCommand();
+        }
         deliveryPill.setSelected(true);
         pastOrdersModel.clear();
         loadedPastOrders = Collections.emptyList();
@@ -384,7 +400,7 @@ public class CustomerPanel extends JPanel {
         Customer saved = validateAndSaveCustomer();
         if (saved != null) {
             lookupStatusLabel.setForeground(Theme.STATUS_SUCCESS);
-            lookupStatusLabel.setText("Customer profile saved/updated in data/customers.txt for " + saved.getName() + ".");
+            lookupStatusLabel.setText("✓ Customer profile saved/updated in data/customers.txt for " + saved.getName() + ".");
         }
     }
 
@@ -420,7 +436,6 @@ public class CustomerPanel extends JPanel {
         String street = streetField.getText().trim();
         String subdivision = subdivisionField.getText().trim();
         String intersection = intersectionField.getText().trim();
-        String chargeAccount = String.valueOf(chargeAccountCombo.getSelectedItem());
 
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter the customer's full name.", "Missing Name", JOptionPane.WARNING_MESSAGE);
@@ -435,7 +450,7 @@ public class CustomerPanel extends JPanel {
             return null;
         }
 
-        Customer customer = new Customer(0, name, digits, orderType, street, subdivision, intersection, chargeAccount);
+        Customer customer = new Customer(0, name, digits, orderType, street, subdivision, intersection, selectedChargeAccount);
         Customer saved = dataStore.saveOrUpdateCustomer(customer);
         frame.setActiveCustomer(saved);
         return saved;
@@ -449,6 +464,45 @@ public class CustomerPanel extends JPanel {
         Customer saved = validateAndSaveCustomer();
         if (saved != null) {
             frame.showCard(PizzaAppFrame.CARD_MENU);
+        }
+    }
+
+    /**
+     * Wraps returning-customer order history lines cleanly inside styled dark cards.
+     */
+    private static class PastOrderCellRenderer extends DefaultListCellRenderer {
+        /** Serial version UID. */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Constructs the {@code PastOrderCellRenderer}.
+         */
+        PastOrderCellRenderer() {
+        }
+
+        /**
+         * Renders each past-order line with word-wrapped HTML text and warm card padding.
+         *
+         * @param list         parent list
+         * @param value        order summary string
+         * @param index        cell index
+         * @param isSelected   selection flag
+         * @param cellHasFocus focus flag
+         * @return styled cell label
+         */
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                      boolean isSelected, boolean cellHasFocus) {
+            JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            lbl.setText("<html><body style='width:390px'>" + String.valueOf(value) + "</body></html>");
+            lbl.setFont(Theme.FONT_BODY);
+            lbl.setForeground(isSelected ? Theme.ACCENT_AMBER : Theme.TEXT_PRIMARY);
+            lbl.setBackground(isSelected ? Theme.BG_CARD : Theme.BG_INPUT);
+            lbl.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_SUBTLE),
+                    BorderFactory.createEmptyBorder(10, 12, 10, 12)
+            ));
+            return lbl;
         }
     }
 }

@@ -5,6 +5,8 @@ import com.momandpop.pizza.model.StaffUser;
 import com.momandpop.pizza.storage.DataStore;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -16,9 +18,6 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
 
 /**
  * Main desktop application window ({@link JFrame}) hosting the styled navigation bar,
@@ -111,8 +110,8 @@ public class PizzaAppFrame extends JFrame {
      */
     private void initFrame() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1240, 860);
-        setMinimumSize(new Dimension(1060, 740));
+        setSize(1280, 880);
+        setMinimumSize(new Dimension(1100, 760));
         setLocationRelativeTo(null);
         getContentPane().setLayout(new BorderLayout());
         getContentPane().setBackground(Theme.BG_APP);
@@ -130,7 +129,7 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Builds the persistent top navigation bar matching the Mom &amp; Pop brand bar.
+     * Builds the persistent top navigation bar matching Figure 5A.
      *
      * @return constructed navigation {@link JPanel}
      */
@@ -138,20 +137,20 @@ public class PizzaAppFrame extends JFrame {
         JPanel nav = new JPanel(new BorderLayout(12, 0));
         nav.setBackground(Theme.BG_HEADER);
         nav.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_STONE),
-                BorderFactory.createEmptyBorder(12, 22, 12, 22)
+                BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_SUBTLE),
+                BorderFactory.createEmptyBorder(12, 24, 12, 24)
         ));
 
-        JPanel brandBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
+        JPanel brandBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 0));
         brandBox.setOpaque(false);
 
-        JPanel titles = new JPanel(new BorderLayout());
+        JPanel titles = new JPanel(new BorderLayout(0, 1));
         titles.setOpaque(false);
         JLabel brand = new JLabel("MOM & POP");
-        brand.setFont(Theme.FONT_TITLE);
+        brand.setFont(Theme.FONT_BRAND);
         brand.setForeground(Theme.TEXT_PRIMARY);
         JLabel subBrand = new JLabel("PIZZERIA & HEARTH");
-        subBrand.setFont(Theme.FONT_LABEL);
+        subBrand.setFont(new java.awt.Font("Monospaced", java.awt.Font.BOLD, 10));
         subBrand.setForeground(Theme.ACCENT_AMBER);
         titles.add(brand, BorderLayout.NORTH);
         titles.add(subBrand, BorderLayout.SOUTH);
@@ -165,19 +164,19 @@ public class PizzaAppFrame extends JFrame {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         buttons.setOpaque(false);
 
-        JButton loginNav = Theme.createSecondaryButton("Home / Login");
+        JButton loginNav = Theme.createSecondaryButton("Menu & Home");
         loginNav.addActionListener(e -> showCard(CARD_LOGIN));
 
         JButton custNav = Theme.createSecondaryButton("1. Customer Info");
         custNav.addActionListener(e -> showCard(CARD_CUSTOMER));
 
-        JButton menuNav = Theme.createSecondaryButton("2. Pizza Builder");
+        JButton menuNav = Theme.createSecondaryButton("2. Build Pizza & Drinks");
         menuNav.addActionListener(e -> {
             menuOrderPanel.refreshCartSummary();
             showCard(CARD_MENU);
         });
 
-        JButton checkoutNav = Theme.createSecondaryButton("3. Checkout");
+        JButton checkoutNav = Theme.createSecondaryButton("3. Review & Pay");
         checkoutNav.addActionListener(e -> openCheckoutScreen());
 
         adminNavBtn.addActionListener(e -> openAdminPortal());
@@ -209,6 +208,8 @@ public class PizzaAppFrame extends JFrame {
         }
         if (CARD_MENU.equals(cardName)) {
             menuOrderPanel.refreshCartSummary();
+        } else if (CARD_CHECKOUT.equals(cardName)) {
+            checkoutReceiptPanel.refreshFinancialSummary();
         }
         cardLayout.show(cardContainer, cardName);
     }
@@ -232,52 +233,35 @@ public class PizzaAppFrame extends JFrame {
      */
     private void promptStaffLoginModal() {
         JDialog dialog = new JDialog(this, "Staff Portal Authentication", true);
-        dialog.setSize(440, 310);
+        dialog.setSize(450, 340);
         dialog.setLocationRelativeTo(this);
         dialog.getContentPane().setBackground(Theme.BG_APP);
         dialog.getContentPane().setLayout(new BorderLayout());
 
-        Theme.RoundedCardPanel card = Theme.createAmberCardPanel("Staff & Owner Authentication Required");
-        card.setLayout(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(6, 4, 6, 8);
-        c.fill = GridBagConstraints.HORIZONTAL;
+        Theme.RoundedCardPanel card = Theme.createTitledCard("Restricted Access", "Staff & Owner Authentication", true);
+        JPanel content = card.getContentPane();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
         JTextField userField = Theme.createTextField(18);
         JPasswordField passField = Theme.createPasswordField(18);
-        JLabel errLabel = new JLabel("Enter valid staff credentials (e.g., owner / pizza123).");
+        JLabel errLabel = new JLabel("Enter valid staff credentials (default: owner / pizza123).");
         errLabel.setFont(Theme.FONT_BODY);
         errLabel.setForeground(Theme.TEXT_MUTED);
+        errLabel.setAlignmentX(LEFT_ALIGNMENT);
 
-        c.gridy = 0;
-        c.gridx = 0;
-        c.gridwidth = 2;
-        card.add(errLabel, c);
-
-        c.gridwidth = 1;
-        c.gridy = 1;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        card.add(Theme.createFieldLabel("USERNAME"), c);
-        c.gridx = 1;
-        c.weightx = 1.0;
-        card.add(userField, c);
-
-        c.gridy = 2;
-        c.gridx = 0;
-        c.weightx = 0.0;
-        card.add(Theme.createFieldLabel("PASSWORD"), c);
-        c.gridx = 1;
-        c.weightx = 1.0;
-        card.add(passField, c);
+        JPanel userStack = Theme.createStackedInput("WORKER / ADMIN USERNAME", userField);
+        userStack.setAlignmentX(LEFT_ALIGNMENT);
+        JPanel passStack = Theme.createStackedInput("SECURITY PASSWORD", passField);
+        passStack.setAlignmentX(LEFT_ALIGNMENT);
 
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         btnRow.setOpaque(false);
+        btnRow.setAlignmentX(LEFT_ALIGNMENT);
 
         JButton cancelBtn = Theme.createSecondaryButton("Cancel");
         cancelBtn.addActionListener(e -> dialog.dispose());
 
-        JButton unlockBtn = Theme.createPrimaryButton("Unlock Staff Portal →");
+        JButton unlockBtn = Theme.createPrimaryButton("Unlock Staff Dashboard →");
         unlockBtn.addActionListener(e -> {
             String u = userField.getText().trim();
             String p = new String(passField.getPassword());
@@ -296,10 +280,13 @@ public class PizzaAppFrame extends JFrame {
         btnRow.add(cancelBtn);
         btnRow.add(unlockBtn);
 
-        c.gridy = 3;
-        c.gridx = 0;
-        c.gridwidth = 2;
-        card.add(btnRow, c);
+        content.add(errLabel);
+        content.add(Box.createVerticalStrut(12));
+        content.add(userStack);
+        content.add(Box.createVerticalStrut(10));
+        content.add(passStack);
+        content.add(Box.createVerticalStrut(16));
+        content.add(btnRow);
 
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(Theme.BG_APP);
@@ -400,6 +387,24 @@ public class PizzaAppFrame extends JFrame {
      */
     public StaffUser getLoggedInStaff() {
         return loggedInStaff;
+    }
+
+    /**
+     * Returns the {@link CheckoutReceiptPanel} reference.
+     *
+     * @return checkout receipt panel
+     */
+    public CheckoutReceiptPanel getCheckoutReceiptPanel() {
+        return checkoutReceiptPanel;
+    }
+
+    /**
+     * Returns the {@link CustomerPanel} reference.
+     *
+     * @return customer panel
+     */
+    public CustomerPanel getCustomerPanel() {
+        return customerPanel;
     }
 
     /**
