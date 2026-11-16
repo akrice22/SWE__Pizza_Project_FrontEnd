@@ -26,15 +26,19 @@ public class Customer {
     /** Nearest major intersection to assist delivery drivers. */
     private String nearestIntersection;
 
+    /** Customer charge account type such as "Visa", "MasterCard", "Discover", "Amex", or "None". */
+    private String chargeAccountType;
+
     /**
      * Constructs an empty {@code Customer} with delivery as the default order type.
      */
     public Customer() {
         this.orderType = "delivery";
+        this.chargeAccountType = "Visa";
     }
 
     /**
-     * Constructs a {@code Customer} with complete contact and delivery fields.
+     * Constructs a {@code Customer} with complete contact, delivery, and charge account fields.
      *
      * @param id                  unique customer ID
      * @param name                customer full name
@@ -43,9 +47,11 @@ public class Customer {
      * @param streetAddress       street address for delivery
      * @param subdivision         subdivision or complex name
      * @param nearestIntersection nearest major intersection
+     * @param chargeAccountType   charge account type (Visa, MasterCard, Discover, Amex, None)
      */
     public Customer(int id, String name, String phone, String orderType,
-                    String streetAddress, String subdivision, String nearestIntersection) {
+                    String streetAddress, String subdivision, String nearestIntersection,
+                    String chargeAccountType) {
         this.id = id;
         this.name = name;
         this.phone = normalizeDigits(phone);
@@ -53,6 +59,7 @@ public class Customer {
         this.streetAddress = streetAddress == null ? "" : streetAddress;
         this.subdivision = subdivision == null ? "" : subdivision;
         this.nearestIntersection = nearestIntersection == null ? "" : nearestIntersection;
+        this.chargeAccountType = (chargeAccountType == null || chargeAccountType.isEmpty()) ? "None" : chargeAccountType;
     }
 
     /**
@@ -195,6 +202,24 @@ public class Customer {
     }
 
     /**
+     * Returns the customer's charge account type (e.g., Visa, MasterCard, None).
+     *
+     * @return charge account type
+     */
+    public String getChargeAccountType() {
+        return chargeAccountType;
+    }
+
+    /**
+     * Sets the customer's charge account type.
+     *
+     * @param chargeAccountType charge account type
+     */
+    public void setChargeAccountType(String chargeAccountType) {
+        this.chargeAccountType = chargeAccountType;
+    }
+
+    /**
      * Builds a single-line summary of the delivery address.
      *
      * @return combined address string or "Pickup at Counter"
@@ -233,7 +258,7 @@ public class Customer {
     }
 
     /**
-     * Serializes this customer record into a pipe-delimited line for {@code customers.txt}.
+     * Serializes this customer record into an 8-column pipe-delimited line for {@code customers.txt}.
      *
      * @return pipe-delimited representation
      */
@@ -245,11 +270,13 @@ public class Customer {
                 sanitize(orderType),
                 sanitize(streetAddress),
                 sanitize(subdivision),
-                sanitize(nearestIntersection));
+                sanitize(nearestIntersection),
+                sanitize(chargeAccountType));
     }
 
     /**
      * Parses a pipe-delimited line from {@code customers.txt} into a {@code Customer}.
+     * Supports both legacy 7-column records and 8-column records with {@code chargeAccountType}.
      *
      * @param line raw line from {@code customers.txt}
      * @return parsed {@code Customer}, or {@code null} if invalid
@@ -264,6 +291,7 @@ public class Customer {
         }
         try {
             int parsedId = Integer.parseInt(parts[0].trim());
+            String chargeType = parts.length >= 8 ? parts[7].trim() : "None";
             return new Customer(
                     parsedId,
                     parts[1].trim(),
@@ -271,7 +299,8 @@ public class Customer {
                     parts[3].trim(),
                     parts[4].trim(),
                     parts[5].trim(),
-                    parts[6].trim()
+                    parts[6].trim(),
+                    chargeType
             );
         } catch (NumberFormatException ex) {
             return null;

@@ -1,6 +1,7 @@
 package com.momandpop.pizza.ui;
 
 import com.momandpop.pizza.model.Customer;
+import com.momandpop.pizza.model.OrderItem;
 import com.momandpop.pizza.model.OrderRecord;
 import com.momandpop.pizza.storage.DataStore;
 
@@ -10,6 +11,7 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -23,11 +25,13 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Step 1 screen handling 10-digit customer phone lookups from {@code data/customers.txt},
- * past order viewing, fulfillment type selection (Delivery vs. Pickup), and new customer entry.
+ * charge account selection (Visa/MasterCard), profile updates, past order quick reorder,
+ * and fulfillment type selection (Delivery vs. Pickup).
  */
 public class CustomerPanel extends JPanel {
 
@@ -61,6 +65,9 @@ public class CustomerPanel extends JPanel {
     /** Nearest major intersection input field. */
     private final JTextField intersectionField;
 
+    /** Dropdown selecting customer's preferred charge account type. */
+    private final JComboBox<String> chargeAccountCombo;
+
     /** Toggle pill selecting delivery fulfillment ($3.99 fee). */
     private final Theme.TogglePillButton deliveryPill;
 
@@ -69,6 +76,12 @@ public class CustomerPanel extends JPanel {
 
     /** List model displaying past orders for the looked-up customer. */
     private final DefaultListModel<String> pastOrdersModel;
+
+    /** Visual list of past orders. */
+    private final JList<String> historyList;
+
+    /** Cached past orders corresponding to entries in {@code pastOrdersModel}. */
+    private transient List<OrderRecord> loadedPastOrders;
 
     /**
      * Constructs the {@code CustomerPanel}.
@@ -86,9 +99,12 @@ public class CustomerPanel extends JPanel {
         this.streetField = Theme.createTextField(26);
         this.subdivisionField = Theme.createTextField(18);
         this.intersectionField = Theme.createTextField(18);
+        this.chargeAccountCombo = new JComboBox<>(new String[]{"Visa", "MasterCard", "Discover", "Amex", "None (Cash/Check)"});
         this.deliveryPill = new Theme.TogglePillButton("DELIVERY ($3.99 Fee)", true);
         this.pickupPill = new Theme.TogglePillButton("PICKUP (Free)", false);
         this.pastOrdersModel = new DefaultListModel<>();
+        this.historyList = new JList<>(pastOrdersModel);
+        this.loadedPastOrders = Collections.emptyList();
 
         buildLayout();
     }
@@ -114,7 +130,7 @@ public class CustomerPanel extends JPanel {
         findBtn.addActionListener(e -> performPhoneLookup(lookupPhoneField.getText()));
         searchRow.add(findBtn);
 
-        JButton clearBtn = Theme.createSecondaryButton("Clear Form");
+        JButton clearBtn = Theme.createSecondaryButton("Clear / New Customer");
         clearBtn.addActionListener(e -> clearForm());
         searchRow.add(clearBtn);
 
@@ -133,13 +149,20 @@ public class CustomerPanel extends JPanel {
         // Bottom actions
         JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
-        JButton backBtn = Theme.createSecondaryButton("← Return to Home / Login");
+
+        JPanel leftFooter = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftFooter.setOpaque(false);
+        JButton backBtn = Theme.createSecondaryButton("← Return Home");
         backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_LOGIN));
+        JButton updateOnlyBtn = Theme.createSecondaryButton("Update & Save Profile Only");
+        updateOnlyBtn.addActionListener(e -> saveProfileOnly());
+        leftFooter.add(backBtn);
+        leftFooter.add(updateOnlyBtn);
 
         JButton saveContinueBtn = Theme.createPrimaryButton("SAVE DETAILS & BUILD CUSTOM PIZZA →");
         saveContinueBtn.addActionListener(e -> saveAndProceed());
 
-        footer.add(backBtn, BorderLayout.WEST);
+        footer.add(leftFooter, BorderLayout.WEST);
         footer.add(saveContinueBtn, BorderLayout.EAST);
 
         add(lookupCard, BorderLayout.NORTH);
@@ -148,12 +171,12 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Builds the main customer contact and delivery address card.
+     * Builds the main customer contact, charge account, and delivery address card.
      *
      * @return constructed form {@link JPanel}
      */
     private JPanel buildCustomerFormCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Delivery & Customer Info");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Delivery & Customer Master Record");
         card.setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(6, 4, 6, 8);
@@ -171,11 +194,13 @@ public class CustomerPanel extends JPanel {
 
         deliveryPill.addActionListener(e -> updateAddressEnabledState());
         pickupPill.addActionListener(e -> updateAddressEnabledState());
+        Theme.styleComboBox(chargeAccountCombo);
 
         int row = 0;
         addFormRow(card, c, row++, "FULFILLMENT", typePanel);
         addFormRow(card, c, row++, "FULL NAME *", nameField);
         addFormRow(card, c, row++, "PHONE NUMBER *", phoneField);
+        addFormRow(card, c, row++, "CHARGE ACCOUNT", chargeAccountCombo);
         addFormRow(card, c, row++, "STREET ADDRESS", streetField);
         addFormRow(card, c, row++, "SUBDIVISION / APT", subdivisionField);
         addFormRow(card, c, row, "NEAREST INTERSECTION", intersectionField);
@@ -184,7 +209,7 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Builds the returning customer past-orders card.
+     * Builds the returning customer past-orders card with quick reorder action.
      *
      * @return constructed history card {@link JPanel}
      */
@@ -192,7 +217,6 @@ public class CustomerPanel extends JPanel {
         Theme.RoundedCardPanel card = Theme.createCardPanel("Past Favorites (Order History)");
         card.setLayout(new BorderLayout(0, 10));
 
-        JList<String> historyList = new JList<>(pastOrdersModel);
         historyList.setBackground(Theme.BG_INPUT);
         historyList.setForeground(Theme.TEXT_PRIMARY);
         historyList.setFont(Theme.FONT_MONO);
@@ -200,21 +224,30 @@ public class CustomerPanel extends JPanel {
         JScrollPane scroll = new JScrollPane(historyList);
         Theme.styleScrollPane(scroll);
 
+        JPanel south = new JPanel(new BorderLayout(0, 8));
+        south.setOpaque(false);
+
+        JButton reorderBtn = Theme.createSecondaryButton("+ Re-Order Sample Medium Thin Pepperoni & Extra Cheese");
+        reorderBtn.addActionListener(e -> reorderFavoritePizza());
+
         JPanel tipBox = new JPanel();
         tipBox.setLayout(new BoxLayout(tipBox, BoxLayout.Y_AXIS));
         tipBox.setOpaque(false);
         JLabel tip1 = new JLabel("Sample Profiles in data/customers.txt:");
         tip1.setFont(Theme.FONT_LABEL);
         tip1.setForeground(Theme.ACCENT_AMBER);
-        JLabel tip2 = new JLabel("• Jane Doe: 555-555-5555   • James Smith: 124-183-7581   • Juan Ramos: 555-123-4567");
+        JLabel tip2 = new JLabel("• Jane Doe (Visa): 555-555-5555   • James Smith (MC): 124-183-7581");
         tip2.setFont(Theme.FONT_BODY);
         tip2.setForeground(Theme.TEXT_MUTED);
         tipBox.add(tip1);
         tipBox.add(Box.createVerticalStrut(3));
         tipBox.add(tip2);
 
+        south.add(reorderBtn, BorderLayout.NORTH);
+        south.add(tipBox, BorderLayout.SOUTH);
+
         card.add(scroll, BorderLayout.CENTER);
-        card.add(tipBox, BorderLayout.SOUTH);
+        card.add(south, BorderLayout.SOUTH);
         return card;
     }
 
@@ -265,6 +298,7 @@ public class CustomerPanel extends JPanel {
         Customer found = dataStore.findCustomerByPhone(digits);
         pastOrdersModel.clear();
         if (found == null) {
+            loadedPastOrders = Collections.emptyList();
             lookupStatusLabel.setForeground(Theme.ACCENT_AMBER);
             lookupStatusLabel.setText("No prior profile found for " + digits + ". Fill out your details below to register.");
             phoneField.setText(digits);
@@ -272,18 +306,19 @@ public class CustomerPanel extends JPanel {
         }
 
         populateFields(found);
-        List<OrderRecord> history = dataStore.findOrdersByPhone(digits);
-        for (OrderRecord rec : history) {
+        frame.setActiveCustomer(found);
+        loadedPastOrders = dataStore.findOrdersByPhone(digits);
+        for (OrderRecord rec : loadedPastOrders) {
             pastOrdersModel.addElement(String.format("Order #%d • %s • $%.2f (%s) — %s",
                     rec.getOrderId(), rec.getTimestamp(), rec.getGrandTotal(),
                     rec.getPaymentMethod(), rec.getItemsSummary()));
         }
-        if (history.isEmpty()) {
+        if (loadedPastOrders.isEmpty()) {
             pastOrdersModel.addElement("No prior orders on file yet.");
         }
 
         lookupStatusLabel.setForeground(Theme.STATUS_SUCCESS);
-        lookupStatusLabel.setText("Welcome back, " + found.getName() + "! Loaded profile and " + history.size() + " past order(s).");
+        lookupStatusLabel.setText("Welcome back, " + found.getName() + " (" + found.getChargeAccountType() + ")! Loaded " + loadedPastOrders.size() + " past order(s).");
     }
 
     /**
@@ -305,6 +340,21 @@ public class CustomerPanel extends JPanel {
         streetField.setText(c.getStreetAddress());
         subdivisionField.setText(c.getSubdivision());
         intersectionField.setText(c.getNearestIntersection());
+
+        String acct = c.getChargeAccountType();
+        if (acct != null && !acct.isEmpty()) {
+            boolean matched = false;
+            for (int i = 0; i < chargeAccountCombo.getItemCount(); i++) {
+                if (chargeAccountCombo.getItemAt(i).equalsIgnoreCase(acct)) {
+                    chargeAccountCombo.setSelectedIndex(i);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                chargeAccountCombo.setSelectedIndex(chargeAccountCombo.getItemCount() - 1);
+            }
+        }
         updateAddressEnabledState();
     }
 
@@ -318,11 +368,77 @@ public class CustomerPanel extends JPanel {
         streetField.setText("");
         subdivisionField.setText("");
         intersectionField.setText("");
+        chargeAccountCombo.setSelectedIndex(0);
         deliveryPill.setSelected(true);
         pastOrdersModel.clear();
+        loadedPastOrders = Collections.emptyList();
         lookupStatusLabel.setForeground(Theme.TEXT_MUTED);
         lookupStatusLabel.setText("Enter a 10-digit phone number (e.g., 5555555555) to autofill saved details.");
         updateAddressEnabledState();
+    }
+
+    /**
+     * Validates and saves the customer profile without leaving Step 1.
+     */
+    private void saveProfileOnly() {
+        Customer saved = validateAndSaveCustomer();
+        if (saved != null) {
+            lookupStatusLabel.setForeground(Theme.STATUS_SUCCESS);
+            lookupStatusLabel.setText("Customer profile saved/updated in data/customers.txt for " + saved.getName() + ".");
+        }
+    }
+
+    /**
+     * Adds a quick favorite pizza matching the Sprint spec ("Medium, Thin &amp; Crispy, Pepperoni + Extra Cheese")
+     * after ensuring customer info is saved, and jumps straight to the Menu &amp; Cart view.
+     */
+    private void reorderFavoritePizza() {
+        Customer saved = validateAndSaveCustomer();
+        if (saved == null) {
+            return;
+        }
+        OrderItem fav = OrderItem.createPizza(
+                "Medium (12\")",
+                "Thin & Crispy",
+                "Normal Sauce",
+                java.util.Arrays.asList("Artisan Pepperoni", "Extra Mozzarella Cheese"),
+                17.24
+        );
+        frame.getMenuOrderPanel().addItemDirectlyToCart(fav);
+        frame.showCard(PizzaAppFrame.CARD_MENU);
+    }
+
+    /**
+     * Validates customer inputs, persists to {@code customers.txt}, and returns the saved record.
+     *
+     * @return saved {@link Customer}, or {@code null} if validation failed
+     */
+    private Customer validateAndSaveCustomer() {
+        String name = nameField.getText().trim();
+        String digits = Customer.normalizeDigits(phoneField.getText());
+        String orderType = deliveryPill.isSelected() ? "delivery" : "pickup";
+        String street = streetField.getText().trim();
+        String subdivision = subdivisionField.getText().trim();
+        String intersection = intersectionField.getText().trim();
+        String chargeAccount = String.valueOf(chargeAccountCombo.getSelectedItem());
+
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter the customer's full name.", "Missing Name", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+        if (digits.length() != 10) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid 10-digit phone number.", "Invalid Phone Number", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+        if ("delivery".equals(orderType) && street.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Street address is required for delivery orders.", "Missing Street Address", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+
+        Customer customer = new Customer(0, name, digits, orderType, street, subdivision, intersection, chargeAccount);
+        Customer saved = dataStore.saveOrUpdateCustomer(customer);
+        frame.setActiveCustomer(saved);
+        return saved;
     }
 
     /**
@@ -330,29 +446,9 @@ public class CustomerPanel extends JPanel {
      * updates the active session customer, and opens the pizza builder.
      */
     private void saveAndProceed() {
-        String name = nameField.getText().trim();
-        String digits = Customer.normalizeDigits(phoneField.getText());
-        String orderType = deliveryPill.isSelected() ? "delivery" : "pickup";
-        String street = streetField.getText().trim();
-        String subdivision = subdivisionField.getText().trim();
-        String intersection = intersectionField.getText().trim();
-
-        if (name.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter the customer's full name.", "Missing Name", JOptionPane.WARNING_MESSAGE);
-            return;
+        Customer saved = validateAndSaveCustomer();
+        if (saved != null) {
+            frame.showCard(PizzaAppFrame.CARD_MENU);
         }
-        if (digits.length() != 10) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid 10-digit phone number.", "Invalid Phone Number", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if ("delivery".equals(orderType) && street.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Street address is required for delivery orders.", "Missing Street Address", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        Customer customer = new Customer(0, name, digits, orderType, street, subdivision, intersection);
-        Customer saved = dataStore.saveOrUpdateCustomer(customer);
-        frame.setActiveCustomer(saved);
-        frame.showCard(PizzaAppFrame.CARD_MENU);
     }
 }

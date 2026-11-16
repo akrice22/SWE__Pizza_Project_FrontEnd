@@ -42,8 +42,9 @@ public final class MenuCatalog {
             "Extra Sauce"
     ));
 
-    /** Garden vegetable toppings (6 distinct toppings). */
+    /** Garden vegetable &amp; cheese toppings (7 distinct toppings). */
     public static final List<MenuOption> VEGGIE_TOPPINGS = Collections.unmodifiableList(Arrays.asList(
+            new MenuOption("extra-cheese", "Extra Mozzarella Cheese", 1.50, "Artisan Cheese", "veggie"),
             new MenuOption("mushrooms", "Fresh Mushrooms", 1.25, "Garden Veggie", "veggie"),
             new MenuOption("red-onions", "Caramelized Red Onion", 1.00, "Garden Veggie", "veggie"),
             new MenuOption("bell-peppers", "Green Bell Peppers", 1.00, "Garden Veggie", "veggie"),

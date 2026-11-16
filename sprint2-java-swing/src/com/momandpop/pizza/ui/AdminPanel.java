@@ -21,12 +21,17 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.print.PrinterException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 
 /**
  * Password-protected Staff and Owner Management Dashboard reading from
- * {@code data/orders.txt}, {@code data/customers.txt}, and {@code data/staff.txt}.
+ * {@code data/orders.txt}, {@code data/customers.txt}, and {@code data/staff.txt},
+ * including the Daily Business Summary Report, Customer Directory, and Cook Order Slips.
  */
 public class AdminPanel extends JPanel {
 
@@ -42,13 +47,16 @@ public class AdminPanel extends JPanel {
     /** Card identifier for the Staff &amp; Workers tab. */
     private static final String TAB_STAFF = "STAFF";
 
+    /** Card identifier for the Daily Business Summary Report tab. */
+    private static final String TAB_SUMMARY = "SUMMARY";
+
     /** Shared file-based persistence store. */
     private final transient DataStore dataStore;
 
     /** Parent frame coordinator. */
     private final PizzaAppFrame frame;
 
-    /** CardLayout switching between Orders, Customers, and Staff views. */
+    /** CardLayout switching between Orders, Customers, Staff, and Daily Summary views. */
     private final CardLayout tabCardLayout;
 
     /** Panel container holding tab views. */
@@ -71,6 +79,9 @@ public class AdminPanel extends JPanel {
 
     /** Table displaying staff accounts. */
     private final JTable staffTable;
+
+    /** Monospaced report viewer displaying the Daily Business Summary Report. */
+    private final JTextArea dailySummaryArea;
 
     /** Summary header displaying gross revenue, total tax, and total tips. */
     private final JLabel kpiSummaryLabel;
@@ -115,7 +126,7 @@ public class AdminPanel extends JPanel {
         this.ordersTable = new JTable(ordersModel);
 
         this.customersModel = new DefaultTableModel(
-                new String[]{"ID", "Name", "Phone", "Order Type", "Street Address", "Subdivision", "Intersection"}, 0) {
+                new String[]{"ID", "Name", "Phone", "Charge Acct", "Order Type", "Street Address", "Subdivision", "Intersection"}, 0) {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -136,6 +147,7 @@ public class AdminPanel extends JPanel {
         };
         this.staffTable = new JTable(staffModel);
 
+        this.dailySummaryArea = new JTextArea();
         this.kpiSummaryLabel = new JLabel("Gross Revenue: $0.00  •  Tips: $0.00  •  Tax: $0.00");
         this.newStaffUserField = Theme.createTextField(10);
         this.newStaffPassField = Theme.createTextField(10);
@@ -147,7 +159,7 @@ public class AdminPanel extends JPanel {
     }
 
     /**
-     * Assembles the Management Dashboard header, pill navigation tabs, and data tables.
+     * Assembles the Management Dashboard header, pill navigation tabs, and report tables.
      */
     private void buildLayout() {
         setLayout(new BorderLayout(12, 14));
@@ -192,24 +204,29 @@ public class AdminPanel extends JPanel {
         Theme.TogglePillButton ordersTabPill = new Theme.TogglePillButton("TRANSACTIONS & RECEIPTS", true);
         Theme.TogglePillButton customersTabPill = new Theme.TogglePillButton("CUSTOMER DIRECTORY", false);
         Theme.TogglePillButton staffTabPill = new Theme.TogglePillButton("STAFF & WORKERS", false);
+        Theme.TogglePillButton summaryTabPill = new Theme.TogglePillButton("DAILY BUSINESS SUMMARY", false);
 
         ButtonGroup tabGroup = new ButtonGroup();
         tabGroup.add(ordersTabPill);
         tabGroup.add(customersTabPill);
         tabGroup.add(staffTabPill);
+        tabGroup.add(summaryTabPill);
 
         ordersTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_ORDERS));
         customersTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_CUSTOMERS));
         staffTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_STAFF));
+        summaryTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_SUMMARY));
 
         tabsRow.add(ordersTabPill);
         tabsRow.add(customersTabPill);
         tabsRow.add(staffTabPill);
+        tabsRow.add(summaryTabPill);
 
         tabContentPanel.setOpaque(false);
         tabContentPanel.add(buildOrdersTab(), TAB_ORDERS);
         tabContentPanel.add(buildCustomersTab(), TAB_CUSTOMERS);
         tabContentPanel.add(buildStaffTab(), TAB_STAFF);
+        tabContentPanel.add(buildSummaryTab(), TAB_SUMMARY);
         tabCardLayout.show(tabContentPanel, TAB_ORDERS);
 
         JPanel centerContainer = new JPanel(new BorderLayout(0, 12));
@@ -222,7 +239,7 @@ public class AdminPanel extends JPanel {
     }
 
     /**
-     * Builds the Orders &amp; Transactions tab with a receipt inspection button.
+     * Builds the Orders &amp; Transactions tab with Customer Receipt and Cook Slip viewers.
      *
      * @return constructed orders tab {@link JPanel}
      */
@@ -234,10 +251,16 @@ public class AdminPanel extends JPanel {
         Theme.styleScrollPane(scroll);
         p.add(scroll, BorderLayout.CENTER);
 
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         bottom.setOpaque(false);
-        JButton viewReceiptBtn = Theme.createPrimaryButton("Print / View Selected Order Receipt");
-        viewReceiptBtn.addActionListener(e -> viewSelectedOrderReceipt());
+
+        JButton viewSlipBtn = Theme.createSecondaryButton("👨‍🍳 View Cook Order Slip");
+        viewSlipBtn.addActionListener(e -> viewSelectedOrderDocument(true));
+
+        JButton viewReceiptBtn = Theme.createPrimaryButton("📄 View / Print Customer Receipt");
+        viewReceiptBtn.addActionListener(e -> viewSelectedOrderDocument(false));
+
+        bottom.add(viewSlipBtn);
         bottom.add(viewReceiptBtn);
         p.add(bottom, BorderLayout.SOUTH);
         return p;
@@ -300,7 +323,41 @@ public class AdminPanel extends JPanel {
     }
 
     /**
-     * Reloads all three tables and recalculates revenue KPI metrics from disk.
+     * Builds the Daily Business Summary Report tab displaying totals by payment type and order volume.
+     *
+     * @return constructed summary report tab {@link JPanel}
+     */
+    private JPanel buildSummaryTab() {
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Daily Business Summary Report for Management");
+        p.setLayout(new BorderLayout(0, 10));
+
+        dailySummaryArea.setEditable(false);
+        dailySummaryArea.setBackground(Theme.RECEIPT_PAPER);
+        dailySummaryArea.setForeground(Theme.RECEIPT_INK);
+        dailySummaryArea.setFont(Theme.FONT_MONO);
+        dailySummaryArea.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
+
+        JScrollPane scroll = new JScrollPane(dailySummaryArea);
+        Theme.styleScrollPane(scroll);
+        p.add(scroll, BorderLayout.CENTER);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
+
+        JButton saveBtn = Theme.createSecondaryButton("💾 Save Summary .txt");
+        saveBtn.addActionListener(e -> saveDailySummaryFile());
+
+        JButton printBtn = Theme.createPrimaryButton("🖨️ Print Daily Summary");
+        printBtn.addActionListener(e -> printDailySummary());
+
+        actions.add(saveBtn);
+        actions.add(printBtn);
+        p.add(actions, BorderLayout.SOUTH);
+        return p;
+    }
+
+    /**
+     * Reloads all tables and regenerates the Daily Business Summary Report from disk.
      */
     public final void refreshAllTables() {
         ordersModel.setRowCount(0);
@@ -338,6 +395,7 @@ public class AdminPanel extends JPanel {
                     "#" + c.getId(),
                     c.getName(),
                     c.getFormattedPhone(),
+                    c.getChargeAccountType(),
                     c.getOrderType().toUpperCase(),
                     c.getStreetAddress(),
                     c.getSubdivision(),
@@ -359,12 +417,17 @@ public class AdminPanel extends JPanel {
                     u.isActive() ? "ACTIVE" : "ARCHIVED"
             });
         }
+
+        dailySummaryArea.setText(dataStore.generateDailySummaryReport());
+        dailySummaryArea.setCaretPosition(0);
     }
 
     /**
-     * Opens a styled popup displaying the full thermal-style receipt for the selected order row.
+     * Opens a popup displaying either the Customer Receipt or Cook Order Slip for the selected order.
+     *
+     * @param cookSlip {@code true} to show the kitchen cook slip; {@code false} for customer receipt
      */
-    private void viewSelectedOrderReceipt() {
+    private void viewSelectedOrderDocument(boolean cookSlip) {
         int row = ordersTable.getSelectedRow();
         if (row < 0) {
             JOptionPane.showMessageDialog(this, "Select an order row first.", "No Row Selected", JOptionPane.INFORMATION_MESSAGE);
@@ -374,17 +437,43 @@ public class AdminPanel extends JPanel {
         int targetId = Integer.parseInt(idCell);
         for (OrderRecord rec : dataStore.loadOrders()) {
             if (rec.getOrderId() == targetId) {
-                JTextArea area = new JTextArea(rec.formatReceiptText());
+                String content = cookSlip ? rec.formatCookOrderSlipText() : rec.formatReceiptText();
+                String title = cookSlip ? "Order #" + targetId + " Cook Order Slip" : "Order #" + targetId + " Customer Receipt";
+                JTextArea area = new JTextArea(content);
                 area.setEditable(false);
                 area.setFont(Theme.FONT_MONO);
                 area.setBackground(Theme.RECEIPT_PAPER);
                 area.setForeground(Theme.RECEIPT_INK);
                 area.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
                 JScrollPane sp = new JScrollPane(area);
-                sp.setPreferredSize(new Dimension(480, 500));
-                JOptionPane.showMessageDialog(this, sp, "Order #" + targetId + " Receipt", JOptionPane.PLAIN_MESSAGE);
+                sp.setPreferredSize(new Dimension(490, 520));
+                JOptionPane.showMessageDialog(this, sp, title, JOptionPane.PLAIN_MESSAGE);
                 return;
             }
+        }
+    }
+
+    /**
+     * Exports the Daily Business Summary Report to {@code data/daily_summary.txt}.
+     */
+    private void saveDailySummaryFile() {
+        Path out = dataStore.getDataDir().resolve("daily_summary.txt");
+        try {
+            Files.write(out, dailySummaryArea.getText().getBytes(StandardCharsets.UTF_8));
+            JOptionPane.showMessageDialog(this, "Saved Daily Summary to: " + out.toAbsolutePath(), "Report Saved", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Failed to save report: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Prints the Daily Business Summary Report.
+     */
+    private void printDailySummary() {
+        try {
+            dailySummaryArea.print();
+        } catch (PrinterException ex) {
+            JOptionPane.showMessageDialog(this, "Print failed: " + ex.getMessage(), "Print Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 

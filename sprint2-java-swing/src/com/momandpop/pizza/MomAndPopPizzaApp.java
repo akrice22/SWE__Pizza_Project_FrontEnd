@@ -78,8 +78,13 @@ public final class MomAndPopPizzaApp {
         }
 
         Customer jane = dataStore.findCustomerByPhone("555-555-5555");
-        if (jane == null || !"Jane Doe".equals(jane.getName())) {
-            throw new IllegalStateException("Customer lookup for 555-555-5555 failed.");
+        if (jane == null || !"Jane Doe".equals(jane.getName()) || !"Visa".equalsIgnoreCase(jane.getChargeAccountType())) {
+            throw new IllegalStateException("Customer lookup or charge account verification for 555-555-5555 failed.");
+        }
+
+        if (MenuCatalog.findToppingByName("Extra Mozzarella Cheese") == null
+                || MenuCatalog.findToppingByName("Artisan Pepperoni") == null) {
+            throw new IllegalStateException("Required sample toppings (Extra Mozzarella Cheese / Artisan Pepperoni) missing.");
         }
 
         if (MenuCatalog.PIZZA_SIZES.size() < 4
@@ -97,16 +102,20 @@ public final class MomAndPopPizzaApp {
         }
 
         List<OrderItem> sampleItems = Arrays.asList(
-                OrderItem.createPizza("Large (14\")", "Thin & Crispy", "Normal Sauce",
-                        Arrays.asList("Artisan Pepperoni", "Fresh Mushrooms"), 19.99),
+                OrderItem.createPizza("Medium (12\")", "Thin & Crispy", "Normal Sauce",
+                        Arrays.asList("Artisan Pepperoni", "Extra Mozzarella Cheese"), 17.24),
                 OrderItem.createBeverage("Mexican Cane Sugar Coca-Cola", "Large (32 oz)", 4.00, 1)
         );
         OrderRecord preview = new OrderRecord(99, "2026-11-16 10:00:00", jane.getName(), jane.getPhone(),
                 "delivery", jane.getFullAddressSummary(), "Check", "Check #2045 ($30.00)",
                 totals[0], totals[1], totals[2], totals[3], totals[4], "Jane Doe", "Smoke test summary", sampleItems);
         String receipt = preview.formatReceiptText();
-        if (!receipt.contains("GRAND TOTAL:") || !receipt.contains("Check #2045")) {
-            throw new IllegalStateException("Receipt formatting verification failed.");
+        String cookSlip = preview.formatCookOrderSlipText();
+        String dailyReport = dataStore.generateDailySummaryReport();
+        if (!receipt.contains("GRAND TOTAL:") || !receipt.contains("Check #2045")
+                || !cookSlip.contains("KITCHEN COOK SLIP") || !cookSlip.contains("EXTRA MOZZARELLA CHEESE")
+                || !dailyReport.contains("DAILY BUSINESS SUMMARY")) {
+            throw new IllegalStateException("Report formatting verification failed.");
         }
 
         System.out.println("SMOKE TEST PASSED: dataDir=" + dataStore.getDataDir().toAbsolutePath()

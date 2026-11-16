@@ -1,17 +1,18 @@
 # Mom & Pop Pizzeria — Java Swing Desktop Application (SWE 3313 Sprint 2)
 
-A 100% standalone Java Swing desktop application (`javax.swing.*`, `java.awt.*`, `java.io.*`, `java.nio.file.*`) migrated from the React frontend for SWE 3313 Sprint 2. Requires **zero external third-party libraries**, zero internet access, and zero database server setup.
+**Team:** Group 5 (Alan Paccor, Nick Pettit, Juan Ramos Diaz, Amy Rice, Mustafa Sayed)  
+A 100% standalone Java Swing desktop application (`javax.swing.*`, `java.awt.*`, `java.io.*`, `java.nio.file.*`) built for SWE 3313 Sprint 2. Requires **zero external third-party libraries**, zero internet access, and zero database server setup.
 
 ---
 
 ## Pre-Configured Logins & Sample Data
 
-On first launch, the app automatically initializes local plain-text files inside `data/`:
+On first launch, the app automatically reads/creates plain-text database files inside `data/`:
 - `data/staff.txt`
 - `data/customers.txt`
 - `data/orders.txt`
 
-### Staff Portal Credentials (`data/staff.txt`)
+### Staff Portal Credentials (`data/staff.txt`) — Password Protected
 | Role | Username | Password |
 | :--- | :--- | :--- |
 | **Owner** | `owner` | `pizza123` |
@@ -19,66 +20,34 @@ On first launch, the app automatically initializes local plain-text files inside
 | **Worker** | `worker1` | `pizza123` |
 
 ### Sample Returning Customer Phone Numbers (`data/customers.txt`)
-- `555-555-5555` (`Jane Doe` — Delivery to `123 Oak Street`)
-- `124-183-7581` (`James Smith` — Delivery to `555 Freemont Circle`)
-- `555-123-4567` (`Juan Ramos` — Delivery to `105 Ardenlee Dr`)
+- `555-555-5555` (`Jane Doe` — Delivery to `123 Oak Street`, Charge Account: `Visa`)
+- `124-183-7581` (`James Smith` — Delivery to `555 Freemont Circle`, Charge Account: `MasterCard`)
+- `555-123-4567` (`Juan Ramos` — Delivery to `105 Ardenlee Dr`, Charge Account: `Visa`)
 
 ---
 
-## Project Structure
-
-```text
-sprint2-java-swing/
-├── README.md
-├── compile-and-run.sh          # macOS / Linux compile, JAR build, and launch script
-├── build-exe.bat               # Windows compile, JAR build, and jpackage .exe script
-├── data/                       # Auto-generated plain-text database files
-│   ├── staff.txt
-│   ├── customers.txt
-│   └── orders.txt
-└── src/com/momandpop/pizza/
-    ├── MomAndPopPizzaApp.java  # Main entry point + headless --smoke-test
-    ├── model/
-    │   ├── Customer.java
-    │   ├── MenuCatalog.java    # 4 sizes, 4 crusts, 3 sauces, 12 toppings, 6 drinks x 3 sizes
-    │   ├── OrderItem.java
-    │   ├── OrderRecord.java
-    │   └── StaffUser.java
-    ├── storage/
-    │   └── DataStore.java      # Local file I/O (staff.txt, customers.txt, orders.txt)
-    └── ui/
-        ├── Theme.java
-        ├── PizzaAppFrame.java
-        ├── LoginPanel.java
-        ├── CustomerPanel.java
-        ├── MenuOrderPanel.java
-        ├── CheckoutReceiptPanel.java
-        ├── SignatureCanvasPanel.java
-        └── AdminPanel.java
-```
-
----
-
-## Implemented Sprint 2 Requirements
-1. **Login Screen (`LoginPanel`):** Validates staff username/password against `data/staff.txt`, plus quick-start customer ordering and phone lookup.
-2. **Customer Lookup & Entry (`CustomerPanel`):** 10-digit phone lookup auto-filling returning customer fields and past order history from `customers.txt` / `orders.txt`, plus Delivery ($3.99 fee) vs. Pickup ($0.00 fee) selection.
-3. **Menu & Pizza Builder (`MenuOrderPanel`):**
+## SWE 3313 Sprint 2 Compliance Checklist
+1. **Standalone Desktop GUI:** Uses only standard JDK `javax.swing.*`, `java.awt.*`, `java.io.*`, and `java.nio.file.*` — zero web, HTTP, or Supabase calls.
+2. **File-Based Simulated Database (`DataStore.java`):** Stores staff, customer master records (including phone, address, subdivision, nearest major intersection, and charge account type `Visa`/`MasterCard`), and completed orders in `data/*.txt`.
+3. **Complete Menu & Builder (`MenuOrderPanel.java`):**
    - **4 Pizza Sizes:** Small (10") `$10.99`, Medium (12") `$13.99`, Large (14") `$16.99`, X-Large (16") `$19.99`.
-   - **4 Crusts:** Classic Hand-Tossed, Thin & Crispy, Stone-Baked Thick (`+$1.50`), Garlic Butter Herb (`+$1.00`).
+   - **4 Crust Options:** Classic Hand-Tossed, Thin & Crispy, Stone-Baked Thick (`+$1.50`), Garlic Butter Herb (`+$1.00`).
    - **3 Sauces:** Light Sauce, Normal Sauce, Extra Sauce.
-   - **12 Distinct Toppings (6 Veggies + 6 Meats):** Enforces a strict **maximum of 4 toppings per pizza** with immediate checkbox rollback and warning popup.
-   - **6 Beverages across 3 Sizes:** Small (12 oz), Medium (20 oz `+$0.75`), Large (32 oz `+$1.50`).
-   - Live item price calculation and an interactive cart with Edit, Remove, and Clear controls.
-4. **Checkout & Receipt (`CheckoutReceiptPanel`):**
-   - Payment methods: Credit, Debit, Cash (with change due), and Check (check # + check amount).
-   - Tip presets (`0%`, `15%`, `18%`, `20%`, Custom `$`), 8% sales tax, and $3.99 delivery fee.
-   - Typed and mouse-drawn (`SignatureCanvasPanel`) signature authorization.
-   - Generates a formatted itemized thermal-style receipt and writes the completed order to `data/orders.txt`.
-5. **Staff / Admin View (`AdminPanel`):** Tabular view of `orders.txt`, `customers.txt`, and `staff.txt`, plus gross revenue summary, receipt viewer, and new staff enrollment.
+   - **13 Distinct Toppings (7 Veggie/Cheese incl. Extra Mozzarella Cheese + 6 Meats):** Strictly enforces a **maximum of 4 toppings per pizza**.
+   - **6 Beverages across 3 Distinct Sizes:** Small (12 oz), Medium (20 oz `+$0.75`), Large (32 oz `+$1.50`).
+   - Live item pricing and interactive Order Cart (Add, Edit Pizza, Remove, Clear).
+4. **All 3 Required Reports (`OrderRecord.java`, `DataStore.java`):**
+   - **Customer Receipt:** Itemized receipt with fulfillment type, delivery fee (`$3.99`), 8% sales tax, tip, payment method/amount, and signature line.
+   - **Cook Order Slip:** Kitchen preparation ticket with item prep checklist.
+   - **Daily Business Summary Report:** Management summary showing order volume, tender totals (Credit, Debit, Cash, Check), taxes, tips, and gross revenue.
+5. **Password-Protected Staff Terminal (`PizzaAppFrame.java`, `AdminPanel.java`):**
+   - Requires staff authentication (`owner` / `pizza123`) before viewing Transactions, Customer Directory, Staff Directory, or Daily Summary.
+   - Includes `Lock Terminal` button and password masking toggle.
+6. **Javadoc Documentation:** 100% Javadoc coverage verified with `javadoc -Xdoclint:all -private`.
 
 ---
 
-## How to Compile and Run
+## How to Compile, Run & Package
 
 ### macOS / Linux
 ```bash
@@ -87,19 +56,17 @@ chmod +x compile-and-run.sh
 ./compile-and-run.sh
 ```
 
-To run the automated headless verification test:
+Run automated headless verification:
 ```bash
 ./compile-and-run.sh --smoke-test
 ```
 
-### Windows (Compile & Package `.exe`)
-Ensure JDK 17+ (including `javac`, `jar`, and `jpackage`) is installed. To package a `.exe` installer with `jpackage`, install the WiX Toolset (v3+). Then run:
+### Windows (Compile, Run, and Build `.exe`)
+1. Double-click or run `build-exe.bat` (requires JDK 17+ and WiX Toolset v3+ to produce the native `.exe` installer via `jpackage`).
+2. Or double-click / launch the runnable JAR `build/jar/MomAndPopPizza.jar`:
 ```bat
-cd sprint2-java-swing
-build-exe.bat
+java -jar build\jar\MomAndPopPizza.jar
 ```
-Or run directly without building an installer:
-```bat
-javac -d build\classes src\com\momandpop\pizza\*.java src\com\momandpop\pizza\model\*.java src\com\momandpop\pizza\storage\*.java src\com\momandpop\pizza\ui\*.java
-java -cp build\classes com.momandpop.pizza.MomAndPopPizzaApp
-```
+
+### Deliverable Archive
+`MomAndPopPizza-Sprint2.zip` packages the entire `sprint2-java-swing` project directory (`src/`, `data/`, `build/jar/MomAndPopPizza.jar`, `compile-and-run.sh`, `build-exe.bat`, and `README.md`).

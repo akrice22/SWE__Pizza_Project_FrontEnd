@@ -584,6 +584,20 @@ public class MenuOrderPanel extends JPanel {
     }
 
     /**
+     * Appends an {@link OrderItem} directly to the active cart (e.g., from quick reorder).
+     *
+     * @param item item to add to cart
+     */
+    public void addItemDirectlyToCart(OrderItem item) {
+        if (item == null) {
+            return;
+        }
+        cartItems.add(item);
+        cartListModel.addElement(item);
+        refreshCartSummary();
+    }
+
+    /**
      * Loads a selected pizza from the cart back into the builder for modification.
      */
     private void editSelectedItem() {

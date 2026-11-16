@@ -118,19 +118,19 @@ public class DataStore {
     }
 
     /**
-     * Writes default sample customers to {@code customers.txt}.
+     * Writes default sample customers with charge account types to {@code customers.txt}.
      *
      * @throws IOException if file creation fails
      */
     private void writeDefaultCustomersFile() throws IOException {
         List<String> lines = new ArrayList<>();
-        lines.add("# id|name|phone|orderType|streetAddress|subdivision|nearestIntersection");
+        lines.add("# id|name|phone|orderType|streetAddress|subdivision|nearestIntersection|chargeAccountType");
         lines.add(new Customer(1, "Jane Doe", "5555555555", "delivery",
-                "123 Oak Street", "Amber Ridge Apt 4B", "Main St & 4th Ave").toFileLine());
+                "123 Oak Street", "Amber Ridge Apt 4B", "Main St & 4th Ave", "Visa").toFileLine());
         lines.add(new Customer(2, "James Smith", "1241837581", "delivery",
-                "555 Freemont Circle", "Bethesda", "Oak Rd & Pine St").toFileLine());
+                "555 Freemont Circle", "Bethesda", "Oak Rd & Pine St", "MasterCard").toFileLine());
         lines.add(new Customer(3, "Juan Ramos", "5551234567", "delivery",
-                "105 Ardenlee Dr", "Oakridge", "Maple & 5th").toFileLine());
+                "105 Ardenlee Dr", "Oakridge", "Maple & 5th", "Visa").toFileLine());
         Files.write(customersFile, lines, StandardCharsets.UTF_8);
     }
 
@@ -313,7 +313,7 @@ public class DataStore {
         }
 
         List<String> lines = new ArrayList<>();
-        lines.add("# id|name|phone|orderType|streetAddress|subdivision|nearestIntersection");
+        lines.add("# id|name|phone|orderType|streetAddress|subdivision|nearestIntersection|chargeAccountType");
         for (Customer c : customers) {
             lines.add(c.toFileLine());
         }
@@ -395,6 +395,102 @@ public class DataStore {
             throw new IllegalStateException("Error writing orders.txt", ex);
         }
         return order;
+    }
+
+    /**
+     * Generates a formatted Daily Business Summary Report for store management
+     * aggregating totals from {@code orders.txt}, {@code customers.txt}, and {@code staff.txt}.
+     *
+     * @return formatted multi-line management summary report
+     */
+    public String generateDailySummaryReport() {
+        List<OrderRecord> orders = loadOrders();
+        List<Customer> customers = loadCustomers();
+        List<StaffUser> staff = loadStaffUsers();
+
+        int deliveryCount = 0;
+        int pickupCount = 0;
+        int creditCount = 0;
+        double creditTotal = 0.0;
+        int debitCount = 0;
+        double debitTotal = 0.0;
+        int cashCount = 0;
+        double cashTotal = 0.0;
+        int checkCount = 0;
+        double checkTotal = 0.0;
+
+        double totalSubtotal = 0.0;
+        double totalDeliveryFees = 0.0;
+        double totalTax = 0.0;
+        double totalTips = 0.0;
+        double grossRevenue = 0.0;
+
+        for (OrderRecord o : orders) {
+            if ("delivery".equalsIgnoreCase(o.getOrderType())) {
+                deliveryCount++;
+            } else {
+                pickupCount++;
+            }
+            String method = o.getPaymentMethod() != null ? o.getPaymentMethod().trim().toLowerCase() : "cash";
+            switch (method) {
+                case "credit":
+                    creditCount++;
+                    creditTotal += o.getGrandTotal();
+                    break;
+                case "debit":
+                    debitCount++;
+                    debitTotal += o.getGrandTotal();
+                    break;
+                case "check":
+                    checkCount++;
+                    checkTotal += o.getGrandTotal();
+                    break;
+                default:
+                    cashCount++;
+                    cashTotal += o.getGrandTotal();
+                    break;
+            }
+            totalSubtotal += o.getSubtotal();
+            totalDeliveryFees += o.getDeliveryFee();
+            totalTax += o.getTax();
+            totalTips += o.getTip();
+            grossRevenue += o.getGrandTotal();
+        }
+
+        int activeStaff = 0;
+        for (StaffUser u : staff) {
+            if (u.isActive()) {
+                activeStaff++;
+            }
+        }
+
+        String divider = "======================================================\n";
+        String thin = "------------------------------------------------------\n";
+        StringBuilder sb = new StringBuilder();
+        sb.append(divider);
+        sb.append("     MOM & POP PIZZERIA — DAILY BUSINESS SUMMARY\n");
+        sb.append(divider);
+        sb.append(String.format("Total Completed Orders : %d\n", orders.size()));
+        sb.append(String.format("  - Delivery Orders    : %d\n", deliveryCount));
+        sb.append(String.format("  - Pickup Orders      : %d\n", pickupCount));
+        sb.append(String.format("Registered Customers   : %d\n", customers.size()));
+        sb.append(String.format("Active Staff Members   : %d\n", activeStaff));
+        sb.append(thin);
+        sb.append("PAYMENT TENDER BREAKDOWN:\n");
+        sb.append(String.format("  Credit Card  (%2d tx) : %24s\n", creditCount, String.format("$%.2f", creditTotal)));
+        sb.append(String.format("  Debit Card   (%2d tx) : %24s\n", debitCount, String.format("$%.2f", debitTotal)));
+        sb.append(String.format("  Cash         (%2d tx) : %24s\n", cashCount, String.format("$%.2f", cashTotal)));
+        sb.append(String.format("  Check        (%2d tx) : %24s\n", checkCount, String.format("$%.2f", checkTotal)));
+        sb.append(thin);
+        sb.append("FINANCIAL SUMMARY:\n");
+        sb.append(String.format("  Food & Drink Subtotal: %24s\n", String.format("$%.2f", totalSubtotal)));
+        sb.append(String.format("  Delivery Fees ($3.99): %24s\n", String.format("$%.2f", totalDeliveryFees)));
+        sb.append(String.format("  Sales Tax (8%%)       : %24s\n", String.format("$%.2f", totalTax)));
+        sb.append(String.format("  Customer Tips        : %24s\n", String.format("$%.2f", totalTips)));
+        sb.append(thin);
+        sb.append(String.format("  GROSS REVENUE        : %24s\n", String.format("$%.2f", grossRevenue)));
+        sb.append(divider);
+        return sb.toString();
     }
 
     /**

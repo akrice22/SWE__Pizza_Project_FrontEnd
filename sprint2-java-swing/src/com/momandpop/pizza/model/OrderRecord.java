@@ -436,10 +436,63 @@ public class OrderRecord {
         sb.append(String.format("%-32s %17s\n", "Tip:", String.format("$%.2f", tip)));
         sb.append(divider);
         sb.append(String.format("%-32s %17s\n", "GRAND TOTAL:", String.format("$%.2f", grandTotal)));
+        sb.append(String.format("%-32s %17s\n", "AMOUNT PAID (" + (paymentMethod != null ? paymentMethod.toUpperCase() : "CASH") + "):", String.format("$%.2f", grandTotal)));
         sb.append(divider);
-        sb.append("AUTHORIZED SIGNATURE:\n");
-        sb.append(String.format("  /s/ %s\n", (signature == null || signature.isEmpty()) ? customerName : signature));
+        sb.append("CUSTOMER / CREDIT CARD SIGNATURE:\n\n");
+        sb.append("  X _____________________________________________\n");
+        sb.append(String.format("    Signed: /s/ %s\n", (signature == null || signature.isEmpty()) ? customerName : signature));
         sb.append("\nThank you for ordering from Mom & Pop Pizzeria!\n");
+        return sb.toString();
+    }
+
+    /**
+     * Formats a kitchen preparation order slip for the pizzeria cook.
+     *
+     * @return formatted kitchen cook order slip text
+     */
+    public String formatCookOrderSlipText() {
+        StringBuilder sb = new StringBuilder();
+        String divider = "==================================================\n";
+        String thin = "--------------------------------------------------\n";
+        sb.append(divider);
+        sb.append(String.format("       KITCHEN COOK SLIP — ORDER #%d\n", orderId));
+        sb.append(divider);
+        sb.append(String.format("TIME:        %s\n", timestamp));
+        sb.append(String.format("TYPE:        %s\n", orderType != null ? orderType.toUpperCase() : "DELIVERY"));
+        sb.append(String.format("CUSTOMER:    %s (%s)\n", customerName, customerPhone));
+        if ("delivery".equalsIgnoreCase(orderType)) {
+            sb.append(String.format("DELIVER TO:  %s\n", deliveryAddress));
+        }
+        sb.append(thin);
+        sb.append("ITEMS TO PREPARE:\n\n");
+
+        if (items != null && !items.isEmpty()) {
+            int idx = 1;
+            for (OrderItem item : items) {
+                if (item.isPizza()) {
+                    sb.append(String.format("  [ ] #%d PIZZA: %s\n", idx++, item.getSizeLabel().toUpperCase()));
+                    sb.append(String.format("         CRUST : %s\n", item.getCrustLabel()));
+                    sb.append(String.format("         SAUCE : %s\n", item.getSauceLabel()));
+                    String tops = item.getToppings().isEmpty() ? "CHEESE ONLY" : String.join(", ", item.getToppings()).toUpperCase();
+                    sb.append(String.format("         TOPS  : %s\n\n", tops));
+                } else {
+                    sb.append(String.format("  [ ] #%d DRINK: %dx %s (%s)\n\n",
+                            idx++, item.getQuantity(), item.getBeverageName(), item.getBeverageSize()));
+                }
+            }
+        } else if (itemsSummary != null && !itemsSummary.isEmpty()) {
+            String[] split = itemsSummary.split(" ;; ");
+            int idx = 1;
+            for (String s : split) {
+                sb.append(String.format("  [ ] #%d %s\n", idx++, s));
+            }
+            sb.append("\n");
+        }
+        sb.append(thin);
+        sb.append("PREP CHECKLIST:\n");
+        sb.append("  [ ] Dough Stretched   [ ] Sauced & Topped\n");
+        sb.append("  [ ] Stone-Fired       [ ] Boxed & Checked\n");
+        sb.append(divider);
         return sb.toString();
     }
 

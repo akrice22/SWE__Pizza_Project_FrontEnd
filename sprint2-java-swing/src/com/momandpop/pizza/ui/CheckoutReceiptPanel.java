@@ -36,7 +36,7 @@ import java.util.List;
 /**
  * Step 3 checkout and receipt screen featuring pill selectors for Payment Methods
  * (Credit, Debit, Cash, Check), Tips, interactive Signature Canvas, order persistence
- * to {@code data/orders.txt}, and an authentic paper-styled receipt panel.
+ * to {@code data/orders.txt}, and switcher between Customer Receipt and Cook Order Slip.
  */
 public class CheckoutReceiptPanel extends JPanel {
 
@@ -124,7 +124,13 @@ public class CheckoutReceiptPanel extends JPanel {
     /** Status badge above the receipt paper indicating pending vs. confirmed payment. */
     private final JLabel receiptStatusLabel;
 
-    /** Monospaced text area rendering the formatted receipt. */
+    /** Pill toggle showing Customer Register Receipt view. */
+    private final Theme.TogglePillButton customerReceiptPill;
+
+    /** Pill toggle showing Kitchen Cook Order Slip view. */
+    private final Theme.TogglePillButton cookSlipPill;
+
+    /** Monospaced text area rendering the formatted receipt or cook order slip. */
     private final JTextArea receiptArea;
 
     /** Most recently completed order record shown in the receipt pane. */
@@ -167,6 +173,8 @@ public class CheckoutReceiptPanel extends JPanel {
         this.signatureCanvas = new SignatureCanvasPanel();
         this.authorizeCheck = new JCheckBox("I authorize this transaction and accept this as my signature.");
         this.receiptStatusLabel = new JLabel("● Ready to Confirm Payment");
+        this.customerReceiptPill = new Theme.TogglePillButton("📄 Customer Receipt", true);
+        this.cookSlipPill = new Theme.TogglePillButton("👨‍🍳 Cook Order Slip", false);
         this.receiptArea = new JTextArea();
 
         buildLayout();
@@ -323,13 +331,20 @@ public class CheckoutReceiptPanel extends JPanel {
 
         JPanel footer = new JPanel(new BorderLayout(8, 0));
         footer.setOpaque(false);
+
+        JPanel leftFooter = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        leftFooter.setOpaque(false);
         JButton backBtn = Theme.createSecondaryButton("← Back to Menu");
         backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_MENU));
+        JButton cancelBtn = Theme.createDangerButton("Cancel Order");
+        cancelBtn.addActionListener(e -> frame.startFreshCustomerOrder());
+        leftFooter.add(backBtn);
+        leftFooter.add(cancelBtn);
 
         JButton completeBtn = Theme.createPrimaryButton("AUTHORIZE & COMPLETE ORDER →");
         completeBtn.addActionListener(e -> submitOrder());
 
-        footer.add(backBtn, BorderLayout.WEST);
+        footer.add(leftFooter, BorderLayout.WEST);
         footer.add(completeBtn, BorderLayout.EAST);
 
         card.add(bodyScroll, BorderLayout.CENTER);
@@ -422,26 +437,40 @@ public class CheckoutReceiptPanel extends JPanel {
     }
 
     /**
-     * Constructs the right-hand paper receipt viewer matching the printable register modal.
+     * Constructs the right-hand paper receipt and kitchen cook slip viewer.
      *
      * @return receipt viewer {@link JPanel}
      */
     private JPanel buildReceiptCard() {
-        Theme.RoundedCardPanel card = Theme.createCardPanel("Printable Order Receipt");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Order Reports (Receipt & Cook Slip)");
         card.setLayout(new BorderLayout(0, 10));
 
-        JPanel statusBar = new JPanel(new BorderLayout());
-        statusBar.setOpaque(false);
+        JPanel topBar = new JPanel(new BorderLayout(8, 6));
+        topBar.setOpaque(false);
         receiptStatusLabel.setFont(Theme.FONT_LABEL);
         receiptStatusLabel.setForeground(Theme.ACCENT_AMBER);
-        statusBar.add(receiptStatusLabel, BorderLayout.WEST);
+
+        ButtonGroup docGroup = new ButtonGroup();
+        docGroup.add(customerReceiptPill);
+        docGroup.add(cookSlipPill);
+
+        JPanel docSwitch = new JPanel(new GridLayout(1, 2, 8, 0));
+        docSwitch.setOpaque(false);
+        docSwitch.add(customerReceiptPill);
+        docSwitch.add(cookSlipPill);
+
+        customerReceiptPill.addActionListener(e -> renderDisplayedReport());
+        cookSlipPill.addActionListener(e -> renderDisplayedReport());
+
+        topBar.add(receiptStatusLabel, BorderLayout.NORTH);
+        topBar.add(docSwitch, BorderLayout.SOUTH);
 
         receiptArea.setEditable(false);
         receiptArea.setBackground(Theme.RECEIPT_PAPER);
         receiptArea.setForeground(Theme.RECEIPT_INK);
         receiptArea.setFont(Theme.FONT_MONO);
         receiptArea.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
-        receiptArea.setText("Authorize payment on the left to generate your official receipt...");
+        receiptArea.setText("Authorize payment on the left to generate your official Customer Receipt & Cook Slip...");
 
         JScrollPane scroll = new JScrollPane(receiptArea);
         scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_STONE, 1));
@@ -449,10 +478,10 @@ public class CheckoutReceiptPanel extends JPanel {
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
 
-        JButton saveTxtBtn = Theme.createSecondaryButton("💾 Save Receipt .txt");
+        JButton saveTxtBtn = Theme.createSecondaryButton("💾 Save Report .txt");
         saveTxtBtn.addActionListener(e -> exportReceiptTextFile());
 
-        JButton printBtn = Theme.createSecondaryButton("🖨️ Print Receipt");
+        JButton printBtn = Theme.createSecondaryButton("🖨️ Print");
         printBtn.addActionListener(e -> printReceipt());
 
         JButton newOrderBtn = Theme.createPrimaryButton("Start New Order →");
@@ -462,10 +491,25 @@ public class CheckoutReceiptPanel extends JPanel {
         actions.add(printBtn);
         actions.add(newOrderBtn);
 
-        card.add(statusBar, BorderLayout.NORTH);
+        card.add(topBar, BorderLayout.NORTH);
         card.add(scroll, BorderLayout.CENTER);
         card.add(actions, BorderLayout.SOUTH);
         return card;
+    }
+
+    /**
+     * Switches displayed paper text between Customer Receipt and Cook Order Slip.
+     */
+    private void renderDisplayedReport() {
+        if (latestCompletedOrder == null) {
+            return;
+        }
+        if (cookSlipPill.isSelected()) {
+            receiptArea.setText(latestCompletedOrder.formatCookOrderSlipText());
+        } else {
+            receiptArea.setText(latestCompletedOrder.formatReceiptText());
+        }
+        receiptArea.setCaretPosition(0);
     }
 
     /**
@@ -483,13 +527,14 @@ public class CheckoutReceiptPanel extends JPanel {
 
         double subtotal = frame.getMenuOrderPanel().getCartSubtotal();
         String orderType = cust != null ? cust.getOrderType() : "delivery";
+        String acct = cust != null ? cust.getChargeAccountType() : "Visa";
         double tipAmount = computeSelectedTip(subtotal);
         double[] totals = DataStore.calculateTotals(subtotal, orderType, tipAmount);
 
         breakdownLabel.setText(String.format(
                 "<html>Subtotal: <b>$%.2f</b> &nbsp;|&nbsp; Delivery (%s): <b>$%.2f</b> &nbsp;|&nbsp; Tax (8%%): <b>$%.2f</b><br/>"
-                        + "Tip: <b>$%.2f</b> &nbsp;|&nbsp; <font color='#FDE68A' size='+1'>GRAND TOTAL: $%.2f</font></html>",
-                totals[0], orderType, totals[1], totals[2], totals[3], totals[4]
+                        + "Tip: <b>$%.2f</b> &nbsp;|&nbsp; Acct: <b>%s</b> &nbsp;|&nbsp; <font color='#FDE68A' size='+1'>TOTAL: $%.2f</font></html>",
+                totals[0], orderType, totals[1], totals[2], totals[3], acct, totals[4]
         ));
         updateCashChangeLabel();
     }
@@ -553,6 +598,7 @@ public class CheckoutReceiptPanel extends JPanel {
         String phone = cust != null ? cust.getPhone() : "0000000000";
         String orderType = cust != null ? cust.getOrderType() : "pickup";
         String address = cust != null ? cust.getFullAddressSummary() : "Pickup at Counter";
+        String chargeAcct = cust != null ? cust.getChargeAccountType() : "Card";
 
         double subtotal = frame.getMenuOrderPanel().getCartSubtotal();
         double tip = computeSelectedTip(subtotal);
@@ -568,7 +614,7 @@ public class CheckoutReceiptPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Enter cardholder name and a valid card number.", "Card Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            details = "Card ending in " + digits.substring(digits.length() - 4);
+            details = chargeAcct + " ending in " + digits.substring(digits.length() - 4);
         } else if (cashPill.isSelected()) {
             method = "Cash";
             double tendered;
@@ -646,8 +692,7 @@ public class CheckoutReceiptPanel extends JPanel {
         latestCompletedOrder = dataStore.saveOrder(order);
         receiptStatusLabel.setForeground(Theme.STATUS_SUCCESS);
         receiptStatusLabel.setText("● Payment Confirmed — Order #" + latestCompletedOrder.getOrderId());
-        receiptArea.setText(latestCompletedOrder.formatReceiptText());
-        receiptArea.setCaretPosition(0);
+        renderDisplayedReport();
 
         frame.getMenuOrderPanel().clearCart();
         frame.getAdminPanel().refreshAllTables();
@@ -655,19 +700,20 @@ public class CheckoutReceiptPanel extends JPanel {
     }
 
     /**
-     * Exports the displayed receipt text into {@code data/receipt_<orderId>.txt}.
+     * Exports the displayed receipt or cook slip text into {@code data/}.
      */
     private void exportReceiptTextFile() {
         if (latestCompletedOrder == null) {
-            JOptionPane.showMessageDialog(this, "Complete an order first to save a receipt.", "No Receipt", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Complete an order first to save a report.", "No Report", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        Path out = dataStore.getDataDir().resolve("receipt_" + latestCompletedOrder.getOrderId() + ".txt");
+        String prefix = cookSlipPill.isSelected() ? "cook_slip_" : "receipt_";
+        Path out = dataStore.getDataDir().resolve(prefix + latestCompletedOrder.getOrderId() + ".txt");
         try {
             Files.write(out, receiptArea.getText().getBytes(StandardCharsets.UTF_8));
-            JOptionPane.showMessageDialog(this, "Saved receipt to: " + out.toAbsolutePath(), "Receipt Saved", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Saved report to: " + out.toAbsolutePath(), "Report Saved", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Failed to save receipt: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Failed to save report: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
