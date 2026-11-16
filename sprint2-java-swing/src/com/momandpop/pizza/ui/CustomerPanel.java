@@ -5,6 +5,8 @@ import com.momandpop.pizza.model.OrderRecord;
 import com.momandpop.pizza.storage.DataStore;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -12,10 +14,10 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -29,8 +31,11 @@ import java.util.List;
  */
 public class CustomerPanel extends JPanel {
 
+    /** Serial version UID. */
+    private static final long serialVersionUID = 1L;
+
     /** Shared data persistence manager. */
-    private final DataStore dataStore;
+    private final transient DataStore dataStore;
 
     /** Parent frame coordinator. */
     private final PizzaAppFrame frame;
@@ -56,11 +61,11 @@ public class CustomerPanel extends JPanel {
     /** Nearest major intersection input field. */
     private final JTextField intersectionField;
 
-    /** Radio button selecting delivery fulfillment ($3.99 fee). */
-    private final JRadioButton deliveryRadio;
+    /** Toggle pill selecting delivery fulfillment ($3.99 fee). */
+    private final Theme.TogglePillButton deliveryPill;
 
-    /** Radio button selecting counter pickup fulfillment ($0.00 fee). */
-    private final JRadioButton pickupRadio;
+    /** Toggle pill selecting counter pickup fulfillment ($0.00 fee). */
+    private final Theme.TogglePillButton pickupPill;
 
     /** List model displaying past orders for the looked-up customer. */
     private final DefaultListModel<String> pastOrdersModel;
@@ -74,15 +79,15 @@ public class CustomerPanel extends JPanel {
     public CustomerPanel(DataStore dataStore, PizzaAppFrame frame) {
         this.dataStore = dataStore;
         this.frame = frame;
-        this.lookupPhoneField = Theme.createTextField(16);
-        this.lookupStatusLabel = new JLabel("Enter a 10-digit phone number (e.g. 5555555555) to autofill returning details.");
-        this.nameField = Theme.createTextField(24);
-        this.phoneField = Theme.createTextField(18);
-        this.streetField = Theme.createTextField(28);
-        this.subdivisionField = Theme.createTextField(20);
-        this.intersectionField = Theme.createTextField(20);
-        this.deliveryRadio = new JRadioButton("Delivery ($3.99 Fee)", true);
-        this.pickupRadio = new JRadioButton("Pickup (No Delivery Fee)", false);
+        this.lookupPhoneField = Theme.createTextField(18);
+        this.lookupStatusLabel = new JLabel("Enter a 10-digit phone number (e.g., 5555555555) to autofill saved details.");
+        this.nameField = Theme.createTextField(22);
+        this.phoneField = Theme.createTextField(16);
+        this.streetField = Theme.createTextField(26);
+        this.subdivisionField = Theme.createTextField(18);
+        this.intersectionField = Theme.createTextField(18);
+        this.deliveryPill = new Theme.TogglePillButton("DELIVERY ($3.99 Fee)", true);
+        this.pickupPill = new Theme.TogglePillButton("PICKUP (Free)", false);
         this.pastOrdersModel = new DefaultListModel<>();
 
         buildLayout();
@@ -92,31 +97,31 @@ public class CustomerPanel extends JPanel {
      * Assembles the lookup bar, customer form inputs, and past orders history list.
      */
     private void buildLayout() {
-        setLayout(new BorderLayout(16, 16));
+        setLayout(new BorderLayout(16, 14));
         setBackground(Theme.BG_APP);
         setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
 
-        // Top Lookup Bar
-        JPanel lookupCard = Theme.createCardPanel("Step 1A: Quick Lookup (Returning Customers)");
+        // Top Header & Quick Lookup Card
+        Theme.RoundedCardPanel lookupCard = Theme.createAmberCardPanel("Step 01 • Quick Lookup (Returning Customers)");
         lookupCard.setLayout(new BorderLayout(10, 8));
 
         JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         searchRow.setOpaque(false);
-        searchRow.add(Theme.createFieldLabel("Phone Number:"));
+        searchRow.add(Theme.createFieldLabel("PHONE NUMBER"));
         searchRow.add(lookupPhoneField);
 
         JButton findBtn = Theme.createPrimaryButton("Find My Info");
         findBtn.addActionListener(e -> performPhoneLookup(lookupPhoneField.getText()));
         searchRow.add(findBtn);
 
-        JButton clearBtn = Theme.createSecondaryButton("Clear / New Customer");
+        JButton clearBtn = Theme.createSecondaryButton("Clear Form");
         clearBtn.addActionListener(e -> clearForm());
         searchRow.add(clearBtn);
 
         lookupStatusLabel.setFont(Theme.FONT_BODY);
         lookupStatusLabel.setForeground(Theme.TEXT_MUTED);
 
-        lookupCard.add(searchRow, BorderLayout.NORTH);
+        lookupCard.add(searchRow, BorderLayout.CENTER);
         lookupCard.add(lookupStatusLabel, BorderLayout.SOUTH);
 
         // Center split: Left = Form, Right = Past Orders
@@ -126,16 +131,16 @@ public class CustomerPanel extends JPanel {
         centerSplit.add(buildPastOrdersCard());
 
         // Bottom actions
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
-        JButton backBtn = Theme.createSecondaryButton("<- Back to Login");
+        JButton backBtn = Theme.createSecondaryButton("← Return to Home / Login");
         backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_LOGIN));
 
-        JButton saveContinueBtn = Theme.createPrimaryButton("Save Customer Details & Build Pizza ->");
+        JButton saveContinueBtn = Theme.createPrimaryButton("SAVE DETAILS & BUILD CUSTOM PIZZA →");
         saveContinueBtn.addActionListener(e -> saveAndProceed());
 
-        footer.add(backBtn);
-        footer.add(saveContinueBtn);
+        footer.add(backBtn, BorderLayout.WEST);
+        footer.add(saveContinueBtn, BorderLayout.EAST);
 
         add(lookupCard, BorderLayout.NORTH);
         add(centerSplit, BorderLayout.CENTER);
@@ -143,12 +148,12 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Builds the main customer contact and address form card.
+     * Builds the main customer contact and delivery address card.
      *
      * @return constructed form {@link JPanel}
      */
     private JPanel buildCustomerFormCard() {
-        JPanel card = Theme.createCardPanel("Step 1B: Customer & Delivery Details");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Delivery & Customer Info");
         card.setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(6, 4, 6, 8);
@@ -156,57 +161,65 @@ public class CustomerPanel extends JPanel {
         c.anchor = GridBagConstraints.WEST;
 
         ButtonGroup group = new ButtonGroup();
-        group.add(deliveryRadio);
-        group.add(pickupRadio);
-        styleRadio(deliveryRadio);
-        styleRadio(pickupRadio);
+        group.add(deliveryPill);
+        group.add(pickupPill);
 
-        JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        JPanel typePanel = new JPanel(new GridLayout(1, 2, 10, 0));
         typePanel.setOpaque(false);
-        typePanel.add(deliveryRadio);
-        typePanel.add(pickupRadio);
+        typePanel.add(deliveryPill);
+        typePanel.add(pickupPill);
 
-        deliveryRadio.addActionListener(e -> updateAddressEnabledState());
-        pickupRadio.addActionListener(e -> updateAddressEnabledState());
+        deliveryPill.addActionListener(e -> updateAddressEnabledState());
+        pickupPill.addActionListener(e -> updateAddressEnabledState());
 
         int row = 0;
-        addFormRow(card, c, row++, "Order Type:", typePanel);
-        addFormRow(card, c, row++, "Full Name *:", nameField);
-        addFormRow(card, c, row++, "10-Digit Phone *:", phoneField);
-        addFormRow(card, c, row++, "Street Address:", streetField);
-        addFormRow(card, c, row++, "Subdivision / Complex:", subdivisionField);
-        addFormRow(card, c, row, "Nearest Intersection:", intersectionField);
+        addFormRow(card, c, row++, "FULFILLMENT", typePanel);
+        addFormRow(card, c, row++, "FULL NAME *", nameField);
+        addFormRow(card, c, row++, "PHONE NUMBER *", phoneField);
+        addFormRow(card, c, row++, "STREET ADDRESS", streetField);
+        addFormRow(card, c, row++, "SUBDIVISION / APT", subdivisionField);
+        addFormRow(card, c, row, "NEAREST INTERSECTION", intersectionField);
 
         return card;
     }
 
     /**
-     * Builds the returning customer past-orders history card.
+     * Builds the returning customer past-orders card.
      *
      * @return constructed history card {@link JPanel}
      */
     private JPanel buildPastOrdersCard() {
-        JPanel card = Theme.createCardPanel("Past Orders (customers.txt / orders.txt)");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Past Favorites (Order History)");
         card.setLayout(new BorderLayout(0, 10));
 
         JList<String> historyList = new JList<>(pastOrdersModel);
         historyList.setBackground(Theme.BG_INPUT);
         historyList.setForeground(Theme.TEXT_PRIMARY);
         historyList.setFont(Theme.FONT_MONO);
+        historyList.setFixedCellHeight(30);
         JScrollPane scroll = new JScrollPane(historyList);
-        scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_STONE, 1));
+        Theme.styleScrollPane(scroll);
 
-        JLabel tip = new JLabel("Tip: Sample returning customers are 555-555-5555 (Jane Doe) & 124-183-7581 (James Smith).");
-        tip.setFont(Theme.FONT_BODY);
-        tip.setForeground(Theme.TEXT_MUTED);
+        JPanel tipBox = new JPanel();
+        tipBox.setLayout(new BoxLayout(tipBox, BoxLayout.Y_AXIS));
+        tipBox.setOpaque(false);
+        JLabel tip1 = new JLabel("Sample Profiles in data/customers.txt:");
+        tip1.setFont(Theme.FONT_LABEL);
+        tip1.setForeground(Theme.ACCENT_AMBER);
+        JLabel tip2 = new JLabel("• Jane Doe: 555-555-5555   • James Smith: 124-183-7581   • Juan Ramos: 555-123-4567");
+        tip2.setFont(Theme.FONT_BODY);
+        tip2.setForeground(Theme.TEXT_MUTED);
+        tipBox.add(tip1);
+        tipBox.add(Box.createVerticalStrut(3));
+        tipBox.add(tip2);
 
         card.add(scroll, BorderLayout.CENTER);
-        card.add(tip, BorderLayout.SOUTH);
+        card.add(tipBox, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Helper to add a labeled input component row into a {@link GridBagLayout}.
+     * Helper to add a labeled input row inside a {@link GridBagLayout}.
      *
      * @param parent    target panel
      * @param c         constraints object
@@ -214,7 +227,7 @@ public class CustomerPanel extends JPanel {
      * @param labelText field caption
      * @param comp      input component
      */
-    private void addFormRow(JPanel parent, GridBagConstraints c, int row, String labelText, java.awt.Component comp) {
+    private void addFormRow(JPanel parent, GridBagConstraints c, int row, String labelText, Component comp) {
         c.gridy = row;
         c.gridx = 0;
         c.weightx = 0.0;
@@ -226,28 +239,17 @@ public class CustomerPanel extends JPanel {
     }
 
     /**
-     * Styles a radio button with dark stone aesthetics.
-     *
-     * @param rb radio button to style
-     */
-    private void styleRadio(JRadioButton rb) {
-        rb.setOpaque(false);
-        rb.setForeground(Theme.TEXT_PRIMARY);
-        rb.setFont(Theme.FONT_BODY);
-    }
-
-    /**
-     * Enables or disables street address fields depending on Delivery vs. Pickup selection.
+     * Enables or disables delivery address inputs based on Delivery vs. Pickup mode.
      */
     private void updateAddressEnabledState() {
-        boolean isDelivery = deliveryRadio.isSelected();
+        boolean isDelivery = deliveryPill.isSelected();
         streetField.setEnabled(isDelivery);
         subdivisionField.setEnabled(isDelivery);
         intersectionField.setEnabled(isDelivery);
     }
 
     /**
-     * Looks up a customer by 10-digit phone number in {@code data/customers.txt} and populates form fields.
+     * Looks up a customer by 10-digit phone number in {@code data/customers.txt} and fills fields.
      *
      * @param rawPhone raw or formatted phone string
      */
@@ -264,7 +266,7 @@ public class CustomerPanel extends JPanel {
         pastOrdersModel.clear();
         if (found == null) {
             lookupStatusLabel.setForeground(Theme.ACCENT_AMBER);
-            lookupStatusLabel.setText("No profile found for " + digits + ". Fill out your details below to register.");
+            lookupStatusLabel.setText("No prior profile found for " + digits + ". Fill out your details below to register.");
             phoneField.setText(digits);
             return;
         }
@@ -272,12 +274,12 @@ public class CustomerPanel extends JPanel {
         populateFields(found);
         List<OrderRecord> history = dataStore.findOrdersByPhone(digits);
         for (OrderRecord rec : history) {
-            pastOrdersModel.addElement(String.format("Order #%d | %s | $%.2f (%s) - %s",
+            pastOrdersModel.addElement(String.format("Order #%d • %s • $%.2f (%s) — %s",
                     rec.getOrderId(), rec.getTimestamp(), rec.getGrandTotal(),
                     rec.getPaymentMethod(), rec.getItemsSummary()));
         }
         if (history.isEmpty()) {
-            pastOrdersModel.addElement("No past orders on file yet.");
+            pastOrdersModel.addElement("No prior orders on file yet.");
         }
 
         lookupStatusLabel.setForeground(Theme.STATUS_SUCCESS);
@@ -296,9 +298,9 @@ public class CustomerPanel extends JPanel {
         nameField.setText(c.getName());
         phoneField.setText(c.getPhone());
         if ("pickup".equalsIgnoreCase(c.getOrderType())) {
-            pickupRadio.setSelected(true);
+            pickupPill.setSelected(true);
         } else {
-            deliveryRadio.setSelected(true);
+            deliveryPill.setSelected(true);
         }
         streetField.setText(c.getStreetAddress());
         subdivisionField.setText(c.getSubdivision());
@@ -316,21 +318,21 @@ public class CustomerPanel extends JPanel {
         streetField.setText("");
         subdivisionField.setText("");
         intersectionField.setText("");
-        deliveryRadio.setSelected(true);
+        deliveryPill.setSelected(true);
         pastOrdersModel.clear();
         lookupStatusLabel.setForeground(Theme.TEXT_MUTED);
-        lookupStatusLabel.setText("Enter a 10-digit phone number (e.g. 5555555555) to autofill returning details.");
+        lookupStatusLabel.setText("Enter a 10-digit phone number (e.g., 5555555555) to autofill saved details.");
         updateAddressEnabledState();
     }
 
     /**
-     * Validates customer inputs, persists the record to {@code customers.txt},
-     * updates the active session customer, and switches to the menu builder.
+     * Validates customer inputs, persists to {@code customers.txt},
+     * updates the active session customer, and opens the pizza builder.
      */
     private void saveAndProceed() {
         String name = nameField.getText().trim();
         String digits = Customer.normalizeDigits(phoneField.getText());
-        String orderType = deliveryRadio.isSelected() ? "delivery" : "pickup";
+        String orderType = deliveryPill.isSelected() ? "delivery" : "pickup";
         String street = streetField.getText().trim();
         String subdivision = subdivisionField.getText().trim();
         String intersection = intersectionField.getText().trim();

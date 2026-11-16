@@ -6,21 +6,30 @@ import com.momandpop.pizza.storage.DataStore;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 
 /**
- * Main desktop application window ({@link JFrame}) hosting the top navigation bar
- * and a {@link CardLayout} container coordinating all Sprint 2 screens.
+ * Main desktop application window ({@link JFrame}) hosting the styled navigation bar,
+ * password-gated Staff Portal, and {@link CardLayout} coordinating all Sprint 2 screens.
  */
 public class PizzaAppFrame extends JFrame {
 
-    /** Card identifier for the Login screen. */
+    /** Serial version UID. */
+    private static final long serialVersionUID = 1L;
+
+    /** Card identifier for the Login / Home screen. */
     public static final String CARD_LOGIN = "LOGIN";
 
     /** Card identifier for the Customer Lookup &amp; Entry screen. */
@@ -36,7 +45,7 @@ public class PizzaAppFrame extends JFrame {
     public static final String CARD_ADMIN = "ADMIN";
 
     /** Local plain-text storage manager. */
-    private final DataStore dataStore;
+    private final transient DataStore dataStore;
 
     /** Card layout managing screen transitions. */
     private final CardLayout cardLayout;
@@ -44,7 +53,7 @@ public class PizzaAppFrame extends JFrame {
     /** Central container holding all screen panels. */
     private final JPanel cardContainer;
 
-    /** Login screen panel. */
+    /** Login and home landing panel. */
     private final LoginPanel loginPanel;
 
     /** Customer info and lookup panel. */
@@ -62,14 +71,17 @@ public class PizzaAppFrame extends JFrame {
     /** Navigation bar badge displaying current cart count and subtotal. */
     private final JButton cartNavBtn;
 
+    /** Navigation bar Staff Portal button reflecting lock/unlock state. */
+    private final JButton adminNavBtn;
+
     /** Status indicator displaying logged-in staff user or guest mode. */
     private final JLabel sessionStatusLabel;
 
     /** Currently active customer for the in-progress order. */
-    private Customer activeCustomer;
+    private transient Customer activeCustomer;
 
-    /** Currently signed-in staff user, or {@code null} when in guest mode. */
-    private StaffUser loggedInStaff;
+    /** Currently signed-in staff user, or {@code null} when locked. */
+    private transient StaffUser loggedInStaff;
 
     /**
      * Constructs and initializes the {@code PizzaAppFrame}.
@@ -77,12 +89,13 @@ public class PizzaAppFrame extends JFrame {
      * @param dataStore local {@link DataStore} instance
      */
     public PizzaAppFrame(DataStore dataStore) {
-        super("Mom & Pop Pizzeria — Desktop POS & Ordering (Java Swing)");
+        super("Mom & Pop Pizzeria — Desktop POS & Ordering");
         this.dataStore = dataStore;
         this.cardLayout = new CardLayout();
         this.cardContainer = new JPanel(cardLayout);
-        this.cartNavBtn = Theme.createPrimaryButton("Cart (0) - $0.00");
-        this.sessionStatusLabel = new JLabel("Mode: Guest / Walk-in");
+        this.cartNavBtn = Theme.createPrimaryButton("Cart (0) • $0.00");
+        this.adminNavBtn = Theme.createSecondaryButton("🔒 Staff Portal");
+        this.sessionStatusLabel = new JLabel("• Guest Ordering Mode");
 
         this.loginPanel = new LoginPanel(dataStore, this);
         this.customerPanel = new CustomerPanel(dataStore, this);
@@ -94,12 +107,12 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Configures frame dimensions, top navigation header, and card registration.
+     * Configures frame dimensions, dark background, top navigation bar, and cards.
      */
     private void initFrame() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1200, 820);
-        setMinimumSize(new Dimension(1020, 700));
+        setSize(1240, 860);
+        setMinimumSize(new Dimension(1060, 740));
         setLocationRelativeTo(null);
         getContentPane().setLayout(new BorderLayout());
         getContentPane().setBackground(Theme.BG_APP);
@@ -117,51 +130,57 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Builds the persistent top navigation bar across all screens.
+     * Builds the persistent top navigation bar matching the Mom &amp; Pop brand bar.
      *
      * @return constructed navigation {@link JPanel}
      */
     private JPanel buildTopNavBar() {
         JPanel nav = new JPanel(new BorderLayout(12, 0));
-        nav.setBackground(new ColorWithHeader());
+        nav.setBackground(Theme.BG_HEADER);
         nav.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_STONE),
-                BorderFactory.createEmptyBorder(10, 18, 10, 18)
+                BorderFactory.createEmptyBorder(12, 22, 12, 22)
         ));
 
-        JPanel brandBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        JPanel brandBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
         brandBox.setOpaque(false);
-        JLabel brand = new JLabel("MOM & POP PIZZERIA");
+
+        JPanel titles = new JPanel(new BorderLayout());
+        titles.setOpaque(false);
+        JLabel brand = new JLabel("MOM & POP");
         brand.setFont(Theme.FONT_TITLE);
-        brand.setForeground(Theme.ACCENT_AMBER);
+        brand.setForeground(Theme.TEXT_PRIMARY);
+        JLabel subBrand = new JLabel("PIZZERIA & HEARTH");
+        subBrand.setFont(Theme.FONT_LABEL);
+        subBrand.setForeground(Theme.ACCENT_AMBER);
+        titles.add(brand, BorderLayout.NORTH);
+        titles.add(subBrand, BorderLayout.SOUTH);
+
         sessionStatusLabel.setFont(Theme.FONT_LABEL);
         sessionStatusLabel.setForeground(Theme.STATUS_SUCCESS);
-        brandBox.add(brand);
+
+        brandBox.add(titles);
         brandBox.add(sessionStatusLabel);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         buttons.setOpaque(false);
 
-        JButton loginNav = Theme.createSecondaryButton("1. Login");
+        JButton loginNav = Theme.createSecondaryButton("Home / Login");
         loginNav.addActionListener(e -> showCard(CARD_LOGIN));
 
-        JButton custNav = Theme.createSecondaryButton("2. Customer Info");
+        JButton custNav = Theme.createSecondaryButton("1. Customer Info");
         custNav.addActionListener(e -> showCard(CARD_CUSTOMER));
 
-        JButton menuNav = Theme.createSecondaryButton("3. Menu & Pizza Builder");
+        JButton menuNav = Theme.createSecondaryButton("2. Pizza Builder");
         menuNav.addActionListener(e -> {
             menuOrderPanel.refreshCartSummary();
             showCard(CARD_MENU);
         });
 
-        JButton checkoutNav = Theme.createSecondaryButton("4. Checkout & Receipt");
+        JButton checkoutNav = Theme.createSecondaryButton("3. Checkout");
         checkoutNav.addActionListener(e -> openCheckoutScreen());
 
-        JButton adminNav = Theme.createSecondaryButton("5. Staff / Admin View");
-        adminNav.addActionListener(e -> {
-            adminPanel.refreshAllTables();
-            showCard(CARD_ADMIN);
-        });
+        adminNavBtn.addActionListener(e -> openAdminPortal());
 
         cartNavBtn.addActionListener(e -> showCard(CARD_MENU));
 
@@ -169,7 +188,7 @@ public class PizzaAppFrame extends JFrame {
         buttons.add(custNav);
         buttons.add(menuNav);
         buttons.add(checkoutNav);
-        buttons.add(adminNav);
+        buttons.add(adminNavBtn);
         buttons.add(cartNavBtn);
 
         nav.add(brandBox, BorderLayout.WEST);
@@ -179,10 +198,15 @@ public class PizzaAppFrame extends JFrame {
 
     /**
      * Switches the visible screen inside the central {@link CardLayout}.
+     * Attempts to enter {@link #CARD_ADMIN} are gated through {@link #openAdminPortal()}.
      *
-     * @param cardName target card constant (e.g., {@link #CARD_MENU})
+     * @param cardName target card constant
      */
     public void showCard(String cardName) {
+        if (CARD_ADMIN.equals(cardName) && loggedInStaff == null) {
+            openAdminPortal();
+            return;
+        }
         if (CARD_MENU.equals(cardName)) {
             menuOrderPanel.refreshCartSummary();
         }
@@ -190,7 +214,103 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Starts a fresh customer order by clearing customer details and cart, then opening Step 1.
+     * Gates access to the Staff &amp; Management Dashboard behind password authentication.
+     * If no staff account is currently authenticated, displays a modal credential prompt.
+     */
+    public void openAdminPortal() {
+        if (loggedInStaff != null) {
+            adminPanel.refreshAllTables();
+            cardLayout.show(cardContainer, CARD_ADMIN);
+            return;
+        }
+        promptStaffLoginModal();
+    }
+
+    /**
+     * Displays a styled dark-theme modal authentication dialog requiring valid credentials
+     * from {@code data/staff.txt} before unlocking the Admin Portal.
+     */
+    private void promptStaffLoginModal() {
+        JDialog dialog = new JDialog(this, "Staff Portal Authentication", true);
+        dialog.setSize(440, 310);
+        dialog.setLocationRelativeTo(this);
+        dialog.getContentPane().setBackground(Theme.BG_APP);
+        dialog.getContentPane().setLayout(new BorderLayout());
+
+        Theme.RoundedCardPanel card = Theme.createAmberCardPanel("Staff & Owner Authentication Required");
+        card.setLayout(new GridBagLayout());
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(6, 4, 6, 8);
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField userField = Theme.createTextField(18);
+        JPasswordField passField = Theme.createPasswordField(18);
+        JLabel errLabel = new JLabel("Enter valid staff credentials (e.g., owner / pizza123).");
+        errLabel.setFont(Theme.FONT_BODY);
+        errLabel.setForeground(Theme.TEXT_MUTED);
+
+        c.gridy = 0;
+        c.gridx = 0;
+        c.gridwidth = 2;
+        card.add(errLabel, c);
+
+        c.gridwidth = 1;
+        c.gridy = 1;
+        c.gridx = 0;
+        c.weightx = 0.0;
+        card.add(Theme.createFieldLabel("USERNAME"), c);
+        c.gridx = 1;
+        c.weightx = 1.0;
+        card.add(userField, c);
+
+        c.gridy = 2;
+        c.gridx = 0;
+        c.weightx = 0.0;
+        card.add(Theme.createFieldLabel("PASSWORD"), c);
+        c.gridx = 1;
+        c.weightx = 1.0;
+        card.add(passField, c);
+
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        btnRow.setOpaque(false);
+
+        JButton cancelBtn = Theme.createSecondaryButton("Cancel");
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        JButton unlockBtn = Theme.createPrimaryButton("Unlock Staff Portal →");
+        unlockBtn.addActionListener(e -> {
+            String u = userField.getText().trim();
+            String p = new String(passField.getPassword());
+            StaffUser matched = dataStore.authenticateStaff(u, p);
+            if (matched == null) {
+                errLabel.setForeground(Theme.STATUS_ERROR);
+                errLabel.setText("Invalid username or password. Access denied.");
+                passField.setText("");
+                return;
+            }
+            dialog.dispose();
+            onStaffAuthenticated(matched);
+        });
+
+        dialog.getRootPane().setDefaultButton(unlockBtn);
+        btnRow.add(cancelBtn);
+        btnRow.add(unlockBtn);
+
+        c.gridy = 3;
+        c.gridx = 0;
+        c.gridwidth = 2;
+        card.add(btnRow, c);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBackground(Theme.BG_APP);
+        wrapper.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        wrapper.add(card, BorderLayout.CENTER);
+        dialog.getContentPane().add(wrapper, BorderLayout.CENTER);
+        dialog.setVisible(true);
+    }
+
+    /**
+     * Starts a fresh customer order by clearing active customer details and cart, then opening Step 1.
      */
     public void startFreshCustomerOrder() {
         this.activeCustomer = null;
@@ -200,9 +320,9 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Opens the Customer Panel and runs an automatic phone lookup for the supplied number.
+     * Opens the Customer Panel and triggers an automatic 10-digit phone lookup.
      *
-     * @param rawPhone phone number typed on the login screen
+     * @param rawPhone phone number typed on the home screen
      */
     public void startCustomerOrderWithPhone(String rawPhone) {
         showCard(CARD_CUSTOMER);
@@ -210,19 +330,34 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Updates navigation status when a staff member authenticates and opens the Admin view.
+     * Updates session state when staff authentication succeeds and opens the Admin Dashboard.
      *
      * @param user authenticated {@link StaffUser}
      */
     public void onStaffAuthenticated(StaffUser user) {
         this.loggedInStaff = user;
-        sessionStatusLabel.setText("Staff: " + user.getFullName() + " [" + user.getRole().toUpperCase() + "]");
+        adminNavBtn.setText("🔓 Staff Portal");
+        sessionStatusLabel.setForeground(Theme.STATUS_SUCCESS);
+        sessionStatusLabel.setText("• Staff: " + user.getFullName() + " [" + user.getRole().toUpperCase() + "]");
         adminPanel.refreshAllTables();
-        showCard(CARD_ADMIN);
+        cardLayout.show(cardContainer, CARD_ADMIN);
     }
 
     /**
-     * Opens the Checkout &amp; Receipt panel after refreshing financial totals.
+     * Logs out the current staff user, re-locks the Admin Portal behind password protection,
+     * and returns to the Home / Login screen.
+     */
+    public void logoutStaff() {
+        this.loggedInStaff = null;
+        adminNavBtn.setText("🔒 Staff Portal");
+        sessionStatusLabel.setForeground(Theme.STATUS_SUCCESS);
+        sessionStatusLabel.setText("• Guest Ordering Mode");
+        loginPanel.clearPasswordInputs();
+        cardLayout.show(cardContainer, CARD_LOGIN);
+    }
+
+    /**
+     * Refreshes financial totals and opens the Checkout &amp; Receipt panel.
      */
     public void openCheckoutScreen() {
         checkoutReceiptPanel.refreshFinancialSummary();
@@ -236,7 +371,7 @@ public class PizzaAppFrame extends JFrame {
      * @param subtotal current cart subtotal in USD
      */
     public void updateCartBadge(int count, double subtotal) {
-        cartNavBtn.setText(String.format("Cart (%d) - $%.2f", count, subtotal));
+        cartNavBtn.setText(String.format("Cart (%d) • $%.2f", count, subtotal));
     }
 
     /**
@@ -249,7 +384,7 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Sets the active {@link Customer} and refreshes cart delivery fee display.
+     * Sets the active {@link Customer} and refreshes cart delivery fee totals.
      *
      * @param activeCustomer customer record
      */
@@ -259,9 +394,9 @@ public class PizzaAppFrame extends JFrame {
     }
 
     /**
-     * Returns the currently signed-in {@link StaffUser}.
+     * Returns the currently authenticated {@link StaffUser}, or {@code null} if locked.
      *
-     * @return signed-in staff user or {@code null}
+     * @return authenticated staff user or {@code null}
      */
     public StaffUser getLoggedInStaff() {
         return loggedInStaff;
@@ -292,20 +427,5 @@ public class PizzaAppFrame extends JFrame {
      */
     public DataStore getDataStore() {
         return dataStore;
-    }
-
-    /**
-     * Internal dark header background color helper.
-     */
-    private static class ColorWithHeader extends java.awt.Color {
-        /** Serial version UID. */
-        private static final long serialVersionUID = 1L;
-
-        /**
-         * Creates the header espresso color (#191512).
-         */
-        ColorWithHeader() {
-            super(25, 21, 18);
-        }
     }
 }

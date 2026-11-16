@@ -11,6 +11,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -20,15 +21,18 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 
 /**
- * Initial login and entry screen providing staff authentication against {@code data/staff.txt}
- * as well as quick navigation to start a customer order or customer lookup.
+ * Styled Home &amp; Login screen featuring the Mom &amp; Pop Pizzeria hero banner,
+ * returning customer quick-order launcher, and password-protected Staff Portal sign-in.
  */
 public class LoginPanel extends JPanel {
 
-    /** Reference to local file-based data store. */
-    private final DataStore dataStore;
+    /** Serial version UID. */
+    private static final long serialVersionUID = 1L;
 
-    /** Parent frame coordinator for navigating between screens. */
+    /** Reference to local file-based data store. */
+    private final transient DataStore dataStore;
+
+    /** Parent frame coordinator for screen navigation. */
     private final PizzaAppFrame frame;
 
     /** Staff login username input field. */
@@ -40,7 +44,7 @@ public class LoginPanel extends JPanel {
     /** Status banner displaying login feedback or validation errors. */
     private final JLabel statusLabel;
 
-    /** Quick customer phone input field for direct customer login. */
+    /** Quick customer phone input field for returning customer orders. */
     private final JTextField customerPhoneField;
 
     /**
@@ -61,37 +65,27 @@ public class LoginPanel extends JPanel {
     }
 
     /**
-     * Initializes the centered two-column layout for Customer Ordering and Staff Login.
+     * Initializes the centered hero showcase, feature highlights, and dual action cards.
      */
     private void buildLayout() {
         setLayout(new GridBagLayout());
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(24, 32, 24, 32));
+        setBorder(BorderFactory.createEmptyBorder(20, 32, 24, 32));
 
         JPanel container = new JPanel();
         container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
         container.setOpaque(false);
-        container.setMaximumSize(new Dimension(920, 620));
+        container.setMaximumSize(new Dimension(980, 680));
 
-        JPanel heroCard = Theme.createCardPanel(null);
-        heroCard.setLayout(new BoxLayout(heroCard, BoxLayout.Y_AXIS));
-        JLabel headline = new JLabel("MOM & POP PIZZERIA — STONE-FIRED WITH SOUL");
-        headline.setFont(Theme.FONT_TITLE);
-        headline.setForeground(Theme.ACCENT_AMBER);
-        JLabel subtitle = new JLabel("Desktop POS & Custom Pizza Ordering System (Sprint 2 Standalone Edition)");
-        subtitle.setFont(Theme.FONT_BODY);
-        subtitle.setForeground(Theme.TEXT_MUTED);
-        heroCard.add(headline);
-        heroCard.add(Box.createVerticalStrut(6));
-        heroCard.add(subtitle);
+        container.add(buildHeroBanner());
+        container.add(Box.createVerticalStrut(14));
+        container.add(buildFeatureStrip());
+        container.add(Box.createVerticalStrut(16));
 
-        JPanel twoCols = new JPanel(new GridLayout(1, 2, 20, 0));
+        JPanel twoCols = new JPanel(new GridLayout(1, 2, 18, 0));
         twoCols.setOpaque(false);
         twoCols.add(buildCustomerCard());
         twoCols.add(buildStaffCard());
-
-        container.add(heroCard);
-        container.add(Box.createVerticalStrut(20));
         container.add(twoCols);
 
         GridBagConstraints gbc = new GridBagConstraints();
@@ -101,77 +95,150 @@ public class LoginPanel extends JPanel {
     }
 
     /**
+     * Builds the top hero showcase banner matching the landing page aesthetic.
+     *
+     * @return constructed hero banner {@link JPanel}
+     */
+    private JPanel buildHeroBanner() {
+        Theme.RoundedCardPanel hero = Theme.createAmberCardPanel(null);
+        hero.setLayout(new BoxLayout(hero, BoxLayout.Y_AXIS));
+
+        JLabel eyebrow = new JLabel("STONE OVEN HEARTH & KITCHEN");
+        eyebrow.setFont(Theme.FONT_LABEL);
+        eyebrow.setForeground(Theme.ACCENT_AMBER);
+        eyebrow.setAlignmentX(CENTER_ALIGNMENT);
+
+        JLabel headline = new JLabel("STONE-FIRED with SOUL", SwingConstants.CENTER);
+        headline.setFont(Theme.FONT_HERO);
+        headline.setForeground(Theme.TEXT_PRIMARY);
+        headline.setAlignmentX(CENTER_ALIGNMENT);
+
+        JLabel sub = new JLabel("Slow-fermented 48-hour sourdough, crushed San Marzano tomatoes, and craft beverages.", SwingConstants.CENTER);
+        sub.setFont(Theme.FONT_BODY);
+        sub.setForeground(Theme.TEXT_MUTED);
+        sub.setAlignmentX(CENTER_ALIGNMENT);
+
+        JButton cta = Theme.createPrimaryButton("START CUSTOM ORDER →");
+        cta.setAlignmentX(CENTER_ALIGNMENT);
+        cta.addActionListener(e -> frame.startFreshCustomerOrder());
+
+        hero.add(eyebrow);
+        hero.add(Box.createVerticalStrut(6));
+        hero.add(headline);
+        hero.add(Box.createVerticalStrut(6));
+        hero.add(sub);
+        hero.add(Box.createVerticalStrut(14));
+        hero.add(cta);
+        return hero;
+    }
+
+    /**
+     * Builds the 3-column artisan craftsmanship highlight strip.
+     *
+     * @return constructed strip {@link JPanel}
+     */
+    private JPanel buildFeatureStrip() {
+        JPanel strip = new JPanel(new GridLayout(1, 3, 14, 0));
+        strip.setOpaque(false);
+        strip.add(buildHighlightCard("01. 48-HOUR COLD FERMENT", "Naturally leavened dough rested cold for airy, blistered crusts."));
+        strip.add(buildHighlightCard("02. HAND-STRETCHED & FIRED", "Choose from 4 sizes, 4 crusts, and up to 4 gourmet toppings."));
+        strip.add(buildHighlightCard("03. FAST LOCAL DELIVERY", "Flat $3.99 neighborhood delivery or free counter pickup."));
+        return strip;
+    }
+
+    /**
+     * Builds one small highlight block inside the feature strip.
+     *
+     * @param title   highlight title
+     * @param details highlight description
+     * @return constructed highlight {@link JPanel}
+     */
+    private JPanel buildHighlightCard(String title, String details) {
+        Theme.RoundedCardPanel card = Theme.createCardPanel(null);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        JLabel t = new JLabel(title);
+        t.setFont(Theme.FONT_LABEL);
+        t.setForeground(Theme.ACCENT_AMBER);
+        JLabel d = new JLabel("<html><body style='width:220px'>" + details + "</body></html>");
+        d.setFont(Theme.FONT_BODY);
+        d.setForeground(Theme.TEXT_MUTED);
+        card.add(t);
+        card.add(Box.createVerticalStrut(4));
+        card.add(d);
+        return card;
+    }
+
+    /**
      * Builds the left-hand Customer Ordering &amp; Quick Phone Sign-In card.
      *
      * @return constructed customer entry card {@link JPanel}
      */
     private JPanel buildCustomerCard() {
-        JPanel card = Theme.createCardPanel("Customer Ordering");
-        card.setLayout(new BorderLayout(0, 14));
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Customer Ordering Portal");
+        card.setLayout(new BorderLayout(0, 12));
 
-        JPanel info = new JPanel();
-        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
-        info.setOpaque(false);
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setOpaque(false);
 
-        JLabel title = new JLabel("Start a Custom Pizza Order");
+        JLabel title = new JLabel("Returning Customer Quick Lookup");
         title.setFont(Theme.FONT_SUBTITLE);
         title.setForeground(Theme.TEXT_PRIMARY);
 
-        JLabel desc = new JLabel("<html><body style='width:280px'>Build up to 4-topping custom stone-fired pizzas, add cold craft beverages, or look up returning customer profiles by phone number.</body></html>");
+        JLabel desc = new JLabel("<html><body style='width:320px'>Look up saved delivery info &amp; past orders using your 10-digit phone (e.g. <b>5555555555</b>), or start a new guest order.</body></html>");
         desc.setFont(Theme.FONT_BODY);
         desc.setForeground(Theme.TEXT_MUTED);
 
-        JPanel phoneRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 4));
-        phoneRow.setOpaque(false);
-        JLabel phoneHint = Theme.createFieldLabel("Returning Customer Phone (Optional, e.g. 555-555-5555):");
-        customerPhoneField.setText("5555555555");
-        phoneRow.add(phoneHint);
+        JPanel phoneInputRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 4));
+        phoneInputRow.setOpaque(false);
+        phoneInputRow.add(Theme.createFieldLabel("PHONE NUMBER (10 DIGITS)"));
 
-        info.add(title);
-        info.add(Box.createVerticalStrut(8));
-        info.add(desc);
-        info.add(Box.createVerticalStrut(14));
-        info.add(phoneRow);
-        info.add(customerPhoneField);
+        customerPhoneField.setText("5555555555");
+
+        body.add(title);
+        body.add(Box.createVerticalStrut(4));
+        body.add(desc);
+        body.add(Box.createVerticalStrut(10));
+        body.add(phoneInputRow);
+        body.add(customerPhoneField);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         actions.setOpaque(false);
-        JButton lookupBtn = Theme.createSecondaryButton("Lookup & Start Order");
-        lookupBtn.addActionListener(e -> {
-            frame.startCustomerOrderWithPhone(customerPhoneField.getText());
-        });
 
-        JButton startFreshBtn = Theme.createPrimaryButton("Start New Order ->");
+        JButton lookupBtn = Theme.createPrimaryButton("Lookup Customer →");
+        lookupBtn.addActionListener(e -> frame.startCustomerOrderWithPhone(customerPhoneField.getText()));
+
+        JButton startFreshBtn = Theme.createSecondaryButton("New Guest Order");
         startFreshBtn.addActionListener(e -> frame.startFreshCustomerOrder());
 
         actions.add(lookupBtn);
         actions.add(startFreshBtn);
 
-        card.add(info, BorderLayout.CENTER);
+        card.add(body, BorderLayout.CENTER);
         card.add(actions, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Builds the right-hand Staff &amp; Admin Portal login card.
+     * Builds the right-hand Staff &amp; Admin Portal password-protected sign-in card.
      *
      * @return constructed staff login card {@link JPanel}
      */
     private JPanel buildStaffCard() {
-        JPanel card = Theme.createCardPanel("Staff & Management Portal");
-        card.setLayout(new BorderLayout(0, 12));
+        Theme.RoundedCardPanel card = Theme.createCardPanel("🔒 Staff & Owner Terminal Login");
+        card.setLayout(new BorderLayout(0, 10));
 
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(5, 0, 5, 8);
+        c.insets = new Insets(5, 0, 5, 10);
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.WEST;
 
         c.gridx = 0;
         c.gridy = 0;
         c.gridwidth = 2;
-        JLabel hint = new JLabel("<html>Default credentials in <b>data/staff.txt</b>: username <code>owner</code> / password <code>pizza123</code></html>");
+        JLabel hint = new JLabel("<html>Admin access is password-protected (verified against <code>data/staff.txt</code>). Default: <b>owner</b> / <b>pizza123</b></html>");
         hint.setFont(Theme.FONT_BODY);
         hint.setForeground(Theme.TEXT_MUTED);
         form.add(hint, c);
@@ -180,21 +247,19 @@ public class LoginPanel extends JPanel {
         c.gridy = 1;
         c.gridx = 0;
         c.weightx = 0.0;
-        form.add(Theme.createFieldLabel("Username:"), c);
+        form.add(Theme.createFieldLabel("USERNAME"), c);
 
         c.gridx = 1;
         c.weightx = 1.0;
-        usernameField.setText("owner");
         form.add(usernameField, c);
 
         c.gridy = 2;
         c.gridx = 0;
         c.weightx = 0.0;
-        form.add(Theme.createFieldLabel("Password:"), c);
+        form.add(Theme.createFieldLabel("PASSWORD"), c);
 
         c.gridx = 1;
         c.weightx = 1.0;
-        passwordField.setText("pizza123");
         form.add(passwordField, c);
 
         c.gridy = 3;
@@ -206,7 +271,7 @@ public class LoginPanel extends JPanel {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         btnPanel.setOpaque(false);
-        JButton loginBtn = Theme.createPrimaryButton("Sign In to Staff Portal ->");
+        JButton loginBtn = Theme.createPrimaryButton("Unlock Staff Dashboard →");
         loginBtn.addActionListener(e -> handleStaffLogin());
         btnPanel.add(loginBtn);
 
@@ -216,20 +281,38 @@ public class LoginPanel extends JPanel {
     }
 
     /**
-     * Validates staff credentials against {@code data/staff.txt} and opens the Staff/Admin view.
+     * Clears typed staff login credentials when locking the terminal.
+     */
+    public void clearPasswordInputs() {
+        usernameField.setText("");
+        passwordField.setText("");
+        statusLabel.setText(" ");
+    }
+
+    /**
+     * Validates staff credentials against {@code data/staff.txt} and unlocks the Staff/Admin view.
      */
     private void handleStaffLogin() {
         String user = usernameField.getText().trim();
         String pass = new String(passwordField.getPassword());
 
+        if (user.isEmpty() || pass.isEmpty()) {
+            statusLabel.setForeground(Theme.STATUS_ERROR);
+            statusLabel.setText("Enter both username and password.");
+            return;
+        }
+
         StaffUser matched = dataStore.authenticateStaff(user, pass);
         if (matched == null) {
             statusLabel.setForeground(Theme.STATUS_ERROR);
-            statusLabel.setText("Invalid username or password. Check data/staff.txt.");
+            statusLabel.setText("Invalid username or password. Access denied.");
+            passwordField.setText("");
             return;
         }
+
         statusLabel.setForeground(Theme.STATUS_SUCCESS);
-        statusLabel.setText("Welcome, " + matched.getFullName() + " (" + matched.getRole() + ")");
+        statusLabel.setText("Authenticated as " + matched.getFullName() + ".");
+        passwordField.setText("");
         frame.onStaffAuthenticated(matched);
     }
 }

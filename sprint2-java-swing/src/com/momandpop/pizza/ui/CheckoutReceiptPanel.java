@@ -15,7 +15,6 @@ import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -35,29 +34,32 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Step 3 checkout and receipt screen handling payment method selection
- * (Cash, Check, Credit, Debit), gratuity calculation, signature authorization,
- * order persistence to {@code data/orders.txt}, and formatted thermal-style receipt display.
+ * Step 3 checkout and receipt screen featuring pill selectors for Payment Methods
+ * (Credit, Debit, Cash, Check), Tips, interactive Signature Canvas, order persistence
+ * to {@code data/orders.txt}, and an authentic paper-styled receipt panel.
  */
 public class CheckoutReceiptPanel extends JPanel {
 
+    /** Serial version UID. */
+    private static final long serialVersionUID = 1L;
+
     /** Local file persistence store. */
-    private final DataStore dataStore;
+    private final transient DataStore dataStore;
 
     /** Parent frame coordinator. */
     private final PizzaAppFrame frame;
 
-    /** Credit card payment method selector. */
-    private final JRadioButton creditRadio;
+    /** Credit card payment pill button. */
+    private final Theme.TogglePillButton creditPill;
 
-    /** Debit card payment method selector. */
-    private final JRadioButton debitRadio;
+    /** Debit card payment pill button. */
+    private final Theme.TogglePillButton debitPill;
 
-    /** Cash payment method selector. */
-    private final JRadioButton cashRadio;
+    /** Cash payment pill button. */
+    private final Theme.TogglePillButton cashPill;
 
-    /** Physical check payment method selector. */
-    private final JRadioButton checkRadio;
+    /** Check payment pill button. */
+    private final Theme.TogglePillButton checkPill;
 
     /** CardLayout switching sub-forms based on selected tender. */
     private final CardLayout tenderLayout;
@@ -89,20 +91,20 @@ public class CheckoutReceiptPanel extends JPanel {
     /** Check amount tendered input field. */
     private final JTextField checkAmountField;
 
-    /** Custom or preset tip percentage/dollar controls. */
-    private final JRadioButton tip0Radio;
+    /** 0% tip pill button. */
+    private final Theme.TogglePillButton tip0Pill;
 
-    /** 15% preset tip option. */
-    private final JRadioButton tip15Radio;
+    /** 15% tip pill button. */
+    private final Theme.TogglePillButton tip15Pill;
 
-    /** 18% preset tip option. */
-    private final JRadioButton tip18Radio;
+    /** 18% tip pill button. */
+    private final Theme.TogglePillButton tip18Pill;
 
-    /** 20% preset tip option. */
-    private final JRadioButton tip20Radio;
+    /** 20% tip pill button. */
+    private final Theme.TogglePillButton tip20Pill;
 
-    /** Custom dollar tip option. */
-    private final JRadioButton tipCustomRadio;
+    /** Custom dollar tip pill button. */
+    private final Theme.TogglePillButton tipCustomPill;
 
     /** Custom dollar tip input field. */
     private final JTextField customTipField;
@@ -119,11 +121,14 @@ public class CheckoutReceiptPanel extends JPanel {
     /** Explicit authorization consent checkbox. */
     private final JCheckBox authorizeCheck;
 
+    /** Status badge above the receipt paper indicating pending vs. confirmed payment. */
+    private final JLabel receiptStatusLabel;
+
     /** Monospaced text area rendering the formatted receipt. */
     private final JTextArea receiptArea;
 
     /** Most recently completed order record shown in the receipt pane. */
-    private OrderRecord latestCompletedOrder;
+    private transient OrderRecord latestCompletedOrder;
 
     /**
      * Constructs the {@code CheckoutReceiptPanel}.
@@ -134,33 +139,34 @@ public class CheckoutReceiptPanel extends JPanel {
     public CheckoutReceiptPanel(DataStore dataStore, PizzaAppFrame frame) {
         this.dataStore = dataStore;
         this.frame = frame;
-        this.creditRadio = new JRadioButton("Credit", true);
-        this.debitRadio = new JRadioButton("Debit", false);
-        this.cashRadio = new JRadioButton("Cash", false);
-        this.checkRadio = new JRadioButton("Check", false);
+        this.creditPill = new Theme.TogglePillButton("💳 Credit", true);
+        this.debitPill = new Theme.TogglePillButton("🏧 Debit", false);
+        this.cashPill = new Theme.TogglePillButton("💵 Cash", false);
+        this.checkPill = new Theme.TogglePillButton("🧾 Check", false);
         this.tenderLayout = new CardLayout();
         this.tenderPanel = new JPanel(tenderLayout);
 
         this.cardNameField = Theme.createTextField(18);
         this.cardNumberField = Theme.createTextField(18);
-        this.cardExpiryField = Theme.createTextField(8);
-        this.cardCvvField = Theme.createTextField(6);
+        this.cardExpiryField = Theme.createTextField(7);
+        this.cardCvvField = Theme.createTextField(5);
         this.cashTenderedField = Theme.createTextField(10);
         this.cashChangeLabel = new JLabel("Change Due: $0.00");
         this.checkNumberField = Theme.createTextField(10);
         this.checkAmountField = Theme.createTextField(10);
 
-        this.tip0Radio = new JRadioButton("0%", false);
-        this.tip15Radio = new JRadioButton("15%", true);
-        this.tip18Radio = new JRadioButton("18%", false);
-        this.tip20Radio = new JRadioButton("20%", false);
-        this.tipCustomRadio = new JRadioButton("Custom $", false);
-        this.customTipField = Theme.createTextField(7);
+        this.tip0Pill = new Theme.TogglePillButton("0%", false);
+        this.tip15Pill = new Theme.TogglePillButton("15%", true);
+        this.tip18Pill = new Theme.TogglePillButton("18%", false);
+        this.tip20Pill = new Theme.TogglePillButton("20%", false);
+        this.tipCustomPill = new Theme.TogglePillButton("Custom", false);
+        this.customTipField = Theme.createTextField(6);
 
         this.breakdownLabel = new JLabel();
-        this.typedSignatureField = Theme.createTextField(20);
+        this.typedSignatureField = Theme.createTextField(18);
         this.signatureCanvas = new SignatureCanvasPanel();
-        this.authorizeCheck = new JCheckBox("I authorize this transaction and confirm my signature.");
+        this.authorizeCheck = new JCheckBox("I authorize this transaction and accept this as my signature.");
+        this.receiptStatusLabel = new JLabel("● Ready to Confirm Payment");
         this.receiptArea = new JTextArea();
 
         buildLayout();
@@ -170,9 +176,9 @@ public class CheckoutReceiptPanel extends JPanel {
      * Builds the split checkout form (left) and formatted paper receipt display (right).
      */
     private void buildLayout() {
-        setLayout(new GridLayout(1, 2, 16, 0));
+        setLayout(new GridLayout(1, 2, 18, 0));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 20));
+        setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
 
         add(buildPaymentFormCard());
         add(buildReceiptCard());
@@ -184,39 +190,34 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return payment form {@link JPanel}
      */
     private JPanel buildPaymentFormCard() {
-        JPanel card = Theme.createCardPanel("Step 3: Checkout & Payment Authorization");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Step 03 • Review & Pay");
         card.setLayout(new BorderLayout(0, 10));
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setOpaque(false);
 
-        // Payment Method Radios
+        // Payment Method Pills
         ButtonGroup payGroup = new ButtonGroup();
-        payGroup.add(creditRadio);
-        payGroup.add(debitRadio);
-        payGroup.add(cashRadio);
-        payGroup.add(checkRadio);
-        styleRadio(creditRadio);
-        styleRadio(debitRadio);
-        styleRadio(cashRadio);
-        styleRadio(checkRadio);
+        payGroup.add(creditPill);
+        payGroup.add(debitPill);
+        payGroup.add(cashPill);
+        payGroup.add(checkPill);
 
-        JPanel payRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel payRow = new JPanel(new GridLayout(1, 4, 8, 0));
         payRow.setOpaque(false);
-        payRow.add(Theme.createFieldLabel("Payment:"));
-        payRow.add(creditRadio);
-        payRow.add(debitRadio);
-        payRow.add(cashRadio);
-        payRow.add(checkRadio);
+        payRow.add(creditPill);
+        payRow.add(debitPill);
+        payRow.add(cashPill);
+        payRow.add(checkPill);
 
-        creditRadio.addActionListener(e -> tenderLayout.show(tenderPanel, "CARD"));
-        debitRadio.addActionListener(e -> tenderLayout.show(tenderPanel, "CARD"));
-        cashRadio.addActionListener(e -> {
+        creditPill.addActionListener(e -> tenderLayout.show(tenderPanel, "CARD"));
+        debitPill.addActionListener(e -> tenderLayout.show(tenderPanel, "CARD"));
+        cashPill.addActionListener(e -> {
             tenderLayout.show(tenderPanel, "CASH");
             refreshFinancialSummary();
         });
-        checkRadio.addActionListener(e -> {
+        checkPill.addActionListener(e -> {
             tenderLayout.show(tenderPanel, "CHECK");
             refreshFinancialSummary();
         });
@@ -228,70 +229,68 @@ public class CheckoutReceiptPanel extends JPanel {
         tenderPanel.add(buildCheckSubPanel(), "CHECK");
         tenderLayout.show(tenderPanel, "CARD");
 
-        // Tip Selection
+        // Tip Selection Pills
         ButtonGroup tipGroup = new ButtonGroup();
-        tipGroup.add(tip0Radio);
-        tipGroup.add(tip15Radio);
-        tipGroup.add(tip18Radio);
-        tipGroup.add(tip20Radio);
-        tipGroup.add(tipCustomRadio);
-        styleRadio(tip0Radio);
-        styleRadio(tip15Radio);
-        styleRadio(tip18Radio);
-        styleRadio(tip20Radio);
-        styleRadio(tipCustomRadio);
+        tipGroup.add(tip0Pill);
+        tipGroup.add(tip15Pill);
+        tipGroup.add(tip18Pill);
+        tipGroup.add(tip20Pill);
+        tipGroup.add(tipCustomPill);
 
-        JPanel tipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        tipRow.setOpaque(false);
-        tipRow.add(Theme.createFieldLabel("Tip:"));
-        tipRow.add(tip0Radio);
-        tipRow.add(tip15Radio);
-        tipRow.add(tip18Radio);
-        tipRow.add(tip20Radio);
-        tipRow.add(tipCustomRadio);
+        JPanel tipPillsRow = new JPanel(new GridLayout(1, 5, 6, 0));
+        tipPillsRow.setOpaque(false);
+        tipPillsRow.add(tip0Pill);
+        tipPillsRow.add(tip15Pill);
+        tipPillsRow.add(tip18Pill);
+        tipPillsRow.add(tip20Pill);
+        tipPillsRow.add(tipCustomPill);
+
+        JPanel customTipBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        customTipBar.setOpaque(false);
+        customTipBar.add(Theme.createFieldLabel("CUSTOM TIP ($):"));
         customTipField.setText("0.00");
         customTipField.setEnabled(false);
-        tipRow.add(customTipField);
+        customTipBar.add(customTipField);
 
-        tip0Radio.addActionListener(e -> {
+        JButton applyTipBtn = Theme.createSecondaryButton("Recalculate Totals");
+        applyTipBtn.addActionListener(e -> refreshFinancialSummary());
+        customTipBar.add(applyTipBtn);
+
+        tip0Pill.addActionListener(e -> {
             customTipField.setEnabled(false);
             refreshFinancialSummary();
         });
-        tip15Radio.addActionListener(e -> {
+        tip15Pill.addActionListener(e -> {
             customTipField.setEnabled(false);
             refreshFinancialSummary();
         });
-        tip18Radio.addActionListener(e -> {
+        tip18Pill.addActionListener(e -> {
             customTipField.setEnabled(false);
             refreshFinancialSummary();
         });
-        tip20Radio.addActionListener(e -> {
+        tip20Pill.addActionListener(e -> {
             customTipField.setEnabled(false);
             refreshFinancialSummary();
         });
-        tipCustomRadio.addActionListener(e -> {
+        tipCustomPill.addActionListener(e -> {
             customTipField.setEnabled(true);
             refreshFinancialSummary();
         });
 
-        JButton applyTipBtn = Theme.createSecondaryButton("Recalculate");
-        applyTipBtn.addActionListener(e -> refreshFinancialSummary());
-        tipRow.add(applyTipBtn);
-
         // Totals Summary Box
-        JPanel totalsCard = Theme.createCardPanel("Order Summary");
+        Theme.RoundedCardPanel totalsCard = Theme.createAmberCardPanel("Financial Breakdown");
         totalsCard.setLayout(new FlowLayout(FlowLayout.LEFT));
         breakdownLabel.setFont(Theme.FONT_MONO);
         breakdownLabel.setForeground(Theme.TEXT_PRIMARY);
         totalsCard.add(breakdownLabel);
 
         // Signature Block
-        JPanel sigPanel = Theme.createCardPanel("Customer Signature Confirmation");
+        Theme.RoundedCardPanel sigPanel = Theme.createCardPanel("Customer Digital Signature");
         sigPanel.setLayout(new BorderLayout(6, 6));
 
         JPanel typedRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         typedRow.setOpaque(false);
-        typedRow.add(Theme.createFieldLabel("Typed Signature:"));
+        typedRow.add(Theme.createFieldLabel("TYPED NAME:"));
         typedRow.add(typedSignatureField);
         JButton clearSigBtn = Theme.createSecondaryButton("Clear Canvas");
         clearSigBtn.addActionListener(e -> signatureCanvas.clearSignature());
@@ -306,50 +305,57 @@ public class CheckoutReceiptPanel extends JPanel {
         sigPanel.add(authorizeCheck, BorderLayout.SOUTH);
 
         body.add(payRow);
-        body.add(Box.createVerticalStrut(6));
-        body.add(tenderPanel);
-        body.add(Box.createVerticalStrut(6));
-        body.add(tipRow);
         body.add(Box.createVerticalStrut(8));
+        body.add(tenderPanel);
+        body.add(Box.createVerticalStrut(8));
+        body.add(tipPillsRow);
+        body.add(Box.createVerticalStrut(4));
+        body.add(customTipBar);
+        body.add(Box.createVerticalStrut(6));
         body.add(totalsCard);
         body.add(Box.createVerticalStrut(8));
         body.add(sigPanel);
 
+        JScrollPane bodyScroll = new JScrollPane(body);
+        bodyScroll.setBorder(null);
+        bodyScroll.getViewport().setBackground(Theme.BG_CARD);
+        bodyScroll.getVerticalScrollBar().setUnitIncrement(16);
+
         JPanel footer = new JPanel(new BorderLayout(8, 0));
         footer.setOpaque(false);
-        JButton backBtn = Theme.createSecondaryButton("<- Back to Menu");
+        JButton backBtn = Theme.createSecondaryButton("← Back to Menu");
         backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_MENU));
 
-        JButton completeBtn = Theme.createPrimaryButton("Authorize & Complete Order ->");
+        JButton completeBtn = Theme.createPrimaryButton("AUTHORIZE & COMPLETE ORDER →");
         completeBtn.addActionListener(e -> submitOrder());
 
         footer.add(backBtn, BorderLayout.WEST);
         footer.add(completeBtn, BorderLayout.EAST);
 
-        card.add(new JScrollPane(body), BorderLayout.CENTER);
+        card.add(bodyScroll, BorderLayout.CENTER);
         card.add(footer, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Builds Credit/Debit card fields sub-panel.
+     * Builds Credit/Debit card details sub-panel.
      *
      * @return card input {@link JPanel}
      */
     private JPanel buildCardSubPanel() {
-        JPanel p = Theme.createCardPanel("Card Details");
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Card Details");
         p.setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(3, 4, 3, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        cardNumberField.setText("4242424242424242");
+        cardNumberField.setText("4242 4242 4242 4242");
         cardExpiryField.setText("12/28");
         cardCvvField.setText("123");
 
         c.gridy = 0;
         c.gridx = 0;
-        p.add(Theme.createFieldLabel("Cardholder Name:"), c);
+        p.add(Theme.createFieldLabel("CARDHOLDER"), c);
         c.gridx = 1;
         c.weightx = 1.0;
         p.add(cardNameField, c);
@@ -357,14 +363,14 @@ public class CheckoutReceiptPanel extends JPanel {
         c.gridy = 1;
         c.gridx = 0;
         c.weightx = 0.0;
-        p.add(Theme.createFieldLabel("Card Number (16 digits):"), c);
+        p.add(Theme.createFieldLabel("CARD NUMBER"), c);
         c.gridx = 1;
         c.weightx = 1.0;
         p.add(cardNumberField, c);
 
         JPanel expCvv = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         expCvv.setOpaque(false);
-        expCvv.add(Theme.createFieldLabel("Exp (MM/YY):"));
+        expCvv.add(Theme.createFieldLabel("EXP:"));
         expCvv.add(cardExpiryField);
         expCvv.add(Theme.createFieldLabel("CVV:"));
         expCvv.add(cardCvvField);
@@ -382,9 +388,9 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return cash input {@link JPanel}
      */
     private JPanel buildCashSubPanel() {
-        JPanel p = Theme.createCardPanel("Cash Payment");
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Cash Tender Details");
         p.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 4));
-        p.add(Theme.createFieldLabel("Amount Tendered ($):"));
+        p.add(Theme.createFieldLabel("AMOUNT TENDERED ($):"));
         cashTenderedField.setText("50.00");
         p.add(cashTenderedField);
 
@@ -404,32 +410,38 @@ public class CheckoutReceiptPanel extends JPanel {
      * @return check input {@link JPanel}
      */
     private JPanel buildCheckSubPanel() {
-        JPanel p = Theme.createCardPanel("Check Payment Details");
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Physical Check Details");
         p.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 4));
-        p.add(Theme.createFieldLabel("Check #:"));
+        p.add(Theme.createFieldLabel("CHECK #:"));
         checkNumberField.setText("1042");
         p.add(checkNumberField);
-        p.add(Theme.createFieldLabel("Check Amount ($):"));
+        p.add(Theme.createFieldLabel("CHECK AMOUNT ($):"));
         checkAmountField.setText("50.00");
         p.add(checkAmountField);
         return p;
     }
 
     /**
-     * Constructs the right-hand paper receipt viewer and save/print controls.
+     * Constructs the right-hand paper receipt viewer matching the printable register modal.
      *
      * @return receipt viewer {@link JPanel}
      */
     private JPanel buildReceiptCard() {
-        JPanel card = Theme.createCardPanel("Itemized Order Receipt");
+        Theme.RoundedCardPanel card = Theme.createCardPanel("Printable Order Receipt");
         card.setLayout(new BorderLayout(0, 10));
+
+        JPanel statusBar = new JPanel(new BorderLayout());
+        statusBar.setOpaque(false);
+        receiptStatusLabel.setFont(Theme.FONT_LABEL);
+        receiptStatusLabel.setForeground(Theme.ACCENT_AMBER);
+        statusBar.add(receiptStatusLabel, BorderLayout.WEST);
 
         receiptArea.setEditable(false);
         receiptArea.setBackground(Theme.RECEIPT_PAPER);
         receiptArea.setForeground(Theme.RECEIPT_INK);
         receiptArea.setFont(Theme.FONT_MONO);
-        receiptArea.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
-        receiptArea.setText("Complete payment on the left to generate your official receipt...");
+        receiptArea.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
+        receiptArea.setText("Authorize payment on the left to generate your official receipt...");
 
         JScrollPane scroll = new JScrollPane(receiptArea);
         scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_STONE, 1));
@@ -437,26 +449,27 @@ public class CheckoutReceiptPanel extends JPanel {
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
 
-        JButton saveTxtBtn = Theme.createSecondaryButton("Save Receipt .txt");
+        JButton saveTxtBtn = Theme.createSecondaryButton("💾 Save Receipt .txt");
         saveTxtBtn.addActionListener(e -> exportReceiptTextFile());
 
-        JButton printBtn = Theme.createSecondaryButton("Print Receipt");
+        JButton printBtn = Theme.createSecondaryButton("🖨️ Print Receipt");
         printBtn.addActionListener(e -> printReceipt());
 
-        JButton newOrderBtn = Theme.createPrimaryButton("Start New Order");
+        JButton newOrderBtn = Theme.createPrimaryButton("Start New Order →");
         newOrderBtn.addActionListener(e -> frame.startFreshCustomerOrder());
 
         actions.add(saveTxtBtn);
         actions.add(printBtn);
         actions.add(newOrderBtn);
 
+        card.add(statusBar, BorderLayout.NORTH);
         card.add(scroll, BorderLayout.CENTER);
         card.add(actions, BorderLayout.SOUTH);
         return card;
     }
 
     /**
-     * Refreshes the checkout financial summary using current cart items and active customer details.
+     * Refreshes checkout financial totals from the active cart and customer details.
      */
     public void refreshFinancialSummary() {
         Customer cust = frame.getActiveCustomer();
@@ -475,29 +488,29 @@ public class CheckoutReceiptPanel extends JPanel {
 
         breakdownLabel.setText(String.format(
                 "<html>Subtotal: <b>$%.2f</b> &nbsp;|&nbsp; Delivery (%s): <b>$%.2f</b> &nbsp;|&nbsp; Tax (8%%): <b>$%.2f</b><br/>"
-                        + "Tip: <b>$%.2f</b> &nbsp;|&nbsp; <font color='#FDE68A'>GRAND TOTAL: $%.2f</font></html>",
+                        + "Tip: <b>$%.2f</b> &nbsp;|&nbsp; <font color='#FDE68A' size='+1'>GRAND TOTAL: $%.2f</font></html>",
                 totals[0], orderType, totals[1], totals[2], totals[3], totals[4]
         ));
         updateCashChangeLabel();
     }
 
     /**
-     * Computes tip in USD based on the active tip preset or custom amount input.
+     * Computes tip in USD from selected preset pill or custom amount field.
      *
      * @param subtotal current order subtotal
      * @return tip dollar amount
      */
     private double computeSelectedTip(double subtotal) {
-        if (tip0Radio.isSelected()) {
+        if (tip0Pill.isSelected()) {
             return 0.0;
         }
-        if (tip15Radio.isSelected()) {
+        if (tip15Pill.isSelected()) {
             return MenuCatalog.round2(subtotal * 0.15);
         }
-        if (tip18Radio.isSelected()) {
+        if (tip18Pill.isSelected()) {
             return MenuCatalog.round2(subtotal * 0.18);
         }
-        if (tip20Radio.isSelected()) {
+        if (tip20Pill.isSelected()) {
             return MenuCatalog.round2(subtotal * 0.20);
         }
         try {
@@ -508,7 +521,7 @@ public class CheckoutReceiptPanel extends JPanel {
     }
 
     /**
-     * Updates the cash change due label based on entered tendered amount.
+     * Updates the cash change due label based on entered cash tendered.
      */
     private void updateCashChangeLabel() {
         double subtotal = frame.getMenuOrderPanel().getCartSubtotal();
@@ -525,8 +538,8 @@ public class CheckoutReceiptPanel extends JPanel {
     }
 
     /**
-     * Validates payment method inputs and signature, saves the order to {@code data/orders.txt},
-     * renders the thermal receipt, and clears the active cart.
+     * Validates payment method inputs and signature, persists the order to {@code data/orders.txt},
+     * displays the confirmed paper receipt, and clears the cart.
      */
     private void submitOrder() {
         List<OrderItem> items = frame.getMenuOrderPanel().getCartItems();
@@ -548,15 +561,15 @@ public class CheckoutReceiptPanel extends JPanel {
 
         String method;
         String details;
-        if (creditRadio.isSelected() || debitRadio.isSelected()) {
-            method = creditRadio.isSelected() ? "Credit" : "Debit";
+        if (creditPill.isSelected() || debitPill.isSelected()) {
+            method = creditPill.isSelected() ? "Credit" : "Debit";
             String digits = cardNumberField.getText().replaceAll("\\D", "");
             if (cardNameField.getText().trim().isEmpty() || digits.length() < 12) {
                 JOptionPane.showMessageDialog(this, "Enter cardholder name and a valid card number.", "Card Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             details = "Card ending in " + digits.substring(digits.length() - 4);
-        } else if (cashRadio.isSelected()) {
+        } else if (cashPill.isSelected()) {
             method = "Cash";
             double tendered;
             try {
@@ -593,11 +606,11 @@ public class CheckoutReceiptPanel extends JPanel {
 
         String typedSig = typedSignatureField.getText().trim();
         if (typedSig.isEmpty() && !signatureCanvas.hasSignature()) {
-            JOptionPane.showMessageDialog(this, "Please type your signature or draw on the signature pad.", "Signature Required", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please type your signature or draw on the signature canvas.", "Signature Required", JOptionPane.WARNING_MESSAGE);
             return;
         }
         if (!authorizeCheck.isSelected()) {
-            JOptionPane.showMessageDialog(this, "Please check the authorization confirmation box before completing.", "Consent Required", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please check the authorization confirmation box.", "Consent Required", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -631,6 +644,8 @@ public class CheckoutReceiptPanel extends JPanel {
         );
 
         latestCompletedOrder = dataStore.saveOrder(order);
+        receiptStatusLabel.setForeground(Theme.STATUS_SUCCESS);
+        receiptStatusLabel.setText("● Payment Confirmed — Order #" + latestCompletedOrder.getOrderId());
         receiptArea.setText(latestCompletedOrder.formatReceiptText());
         receiptArea.setCaretPosition(0);
 
@@ -644,7 +659,7 @@ public class CheckoutReceiptPanel extends JPanel {
      */
     private void exportReceiptTextFile() {
         if (latestCompletedOrder == null) {
-            JOptionPane.showMessageDialog(this, "Complete an order first to export a receipt.", "No Receipt", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Complete an order first to save a receipt.", "No Receipt", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         Path out = dataStore.getDataDir().resolve("receipt_" + latestCompletedOrder.getOrderId() + ".txt");
@@ -657,7 +672,7 @@ public class CheckoutReceiptPanel extends JPanel {
     }
 
     /**
-     * Sends the receipt text area directly to the operating system print dialog.
+     * Sends the receipt text area to the operating system print dialog.
      */
     private void printReceipt() {
         try {
@@ -665,16 +680,5 @@ public class CheckoutReceiptPanel extends JPanel {
         } catch (PrinterException ex) {
             JOptionPane.showMessageDialog(this, "Print failed: " + ex.getMessage(), "Print Error", JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    /**
-     * Styles radio buttons uniformly.
-     *
-     * @param rb radio button
-     */
-    private void styleRadio(JRadioButton rb) {
-        rb.setOpaque(false);
-        rb.setForeground(Theme.TEXT_PRIMARY);
-        rb.setFont(Theme.FONT_BODY);
     }
 }

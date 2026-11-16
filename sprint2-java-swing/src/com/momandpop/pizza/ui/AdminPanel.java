@@ -6,33 +6,53 @@ import com.momandpop.pizza.model.StaffUser;
 import com.momandpop.pizza.storage.DataStore;
 
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Staff and Owner administrative view reading live records from
+ * Password-protected Staff and Owner Management Dashboard reading from
  * {@code data/orders.txt}, {@code data/customers.txt}, and {@code data/staff.txt}.
  */
 public class AdminPanel extends JPanel {
 
+    /** Serial version UID. */
+    private static final long serialVersionUID = 1L;
+
+    /** Card identifier for the Transactions tab. */
+    private static final String TAB_ORDERS = "ORDERS";
+
+    /** Card identifier for the Customer Directory tab. */
+    private static final String TAB_CUSTOMERS = "CUSTOMERS";
+
+    /** Card identifier for the Staff &amp; Workers tab. */
+    private static final String TAB_STAFF = "STAFF";
+
     /** Shared file-based persistence store. */
-    private final DataStore dataStore;
+    private final transient DataStore dataStore;
 
     /** Parent frame coordinator. */
     private final PizzaAppFrame frame;
+
+    /** CardLayout switching between Orders, Customers, and Staff views. */
+    private final CardLayout tabCardLayout;
+
+    /** Panel container holding tab views. */
+    private final JPanel tabContentPanel;
 
     /** Table model backing the Orders &amp; Transactions tab. */
     private final DefaultTableModel ordersModel;
@@ -67,6 +87,9 @@ public class AdminPanel extends JPanel {
     /** Role selector for enrolling a new staff member. */
     private final JComboBox<String> newStaffRoleCombo;
 
+    /** Controls whether passwords in the staff table are masked or visible. */
+    private boolean showStaffPasswords;
+
     /**
      * Constructs the {@code AdminPanel} and loads initial records from disk.
      *
@@ -76,8 +99,14 @@ public class AdminPanel extends JPanel {
     public AdminPanel(DataStore dataStore, PizzaAppFrame frame) {
         this.dataStore = dataStore;
         this.frame = frame;
+        this.tabCardLayout = new CardLayout();
+        this.tabContentPanel = new JPanel(tabCardLayout);
+        this.showStaffPasswords = false;
+
         this.ordersModel = new DefaultTableModel(
                 new String[]{"Order #", "Timestamp", "Customer", "Phone", "Type", "Payment", "Subtotal", "Tax", "Tip", "Total", "Items"}, 0) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public boolean isCellEditable(int row, int col) {
                 return false;
@@ -87,6 +116,8 @@ public class AdminPanel extends JPanel {
 
         this.customersModel = new DefaultTableModel(
                 new String[]{"ID", "Name", "Phone", "Order Type", "Street Address", "Subdivision", "Intersection"}, 0) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public boolean isCellEditable(int row, int col) {
                 return false;
@@ -95,7 +126,9 @@ public class AdminPanel extends JPanel {
         this.customersTable = new JTable(customersModel);
 
         this.staffModel = new DefaultTableModel(
-                new String[]{"ID", "Username", "Full Name", "Role", "Phone", "Email", "Date Hired", "Active"}, 0) {
+                new String[]{"ID", "Username", "Password", "Full Name", "Role", "Phone", "Email", "Date Hired", "Status"}, 0) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public boolean isCellEditable(int row, int col) {
                 return false;
@@ -103,7 +136,7 @@ public class AdminPanel extends JPanel {
         };
         this.staffTable = new JTable(staffModel);
 
-        this.kpiSummaryLabel = new JLabel("Gross Revenue: $0.00 | Tax: $0.00 | Tips: $0.00");
+        this.kpiSummaryLabel = new JLabel("Gross Revenue: $0.00  •  Tips: $0.00  •  Tax: $0.00");
         this.newStaffUserField = Theme.createTextField(10);
         this.newStaffPassField = Theme.createTextField(10);
         this.newStaffNameField = Theme.createTextField(14);
@@ -114,46 +147,78 @@ public class AdminPanel extends JPanel {
     }
 
     /**
-     * Assembles the tabbed administrative workspace.
+     * Assembles the Management Dashboard header, pill navigation tabs, and data tables.
      */
     private void buildLayout() {
-        setLayout(new BorderLayout(12, 12));
+        setLayout(new BorderLayout(12, 14));
         setBackground(Theme.BG_APP);
-        setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 20));
+        setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
 
-        JPanel header = Theme.createCardPanel(null);
-        header.setLayout(new BorderLayout());
+        // Top Header Card
+        Theme.RoundedCardPanel header = Theme.createAmberCardPanel(null);
+        header.setLayout(new BorderLayout(12, 10));
 
-        JLabel title = new JLabel("STAFF & MANAGEMENT PORTAL (Local File Store)");
-        title.setFont(Theme.FONT_SUBTITLE);
-        title.setForeground(Theme.ACCENT_AMBER);
+        JPanel titleStack = new JPanel(new BorderLayout(0, 2));
+        titleStack.setOpaque(false);
+        JLabel badge = new JLabel("● STAFF & OWNER TERMINAL (PASSWORD PROTECTED)");
+        badge.setFont(Theme.FONT_LABEL);
+        badge.setForeground(Theme.STATUS_SUCCESS);
+        JLabel title = new JLabel("MOM & POP MANAGEMENT DASHBOARD");
+        title.setFont(Theme.FONT_TITLE);
+        title.setForeground(Theme.TEXT_PRIMARY);
+        titleStack.add(badge, BorderLayout.NORTH);
+        titleStack.add(title, BorderLayout.SOUTH);
 
-        kpiSummaryLabel.setFont(Theme.FONT_MONO_BOLD);
-        kpiSummaryLabel.setForeground(Theme.STATUS_SUCCESS);
-
-        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightControls.setOpaque(false);
+        kpiSummaryLabel.setFont(Theme.FONT_MONO_BOLD);
+        kpiSummaryLabel.setForeground(Theme.ACCENT_AMBER);
         rightControls.add(kpiSummaryLabel);
 
-        JButton refreshBtn = Theme.createSecondaryButton("Reload Files");
+        JButton refreshBtn = Theme.createSecondaryButton("Reload .txt Files");
         refreshBtn.addActionListener(e -> refreshAllTables());
         rightControls.add(refreshBtn);
 
-        JButton backBtn = Theme.createPrimaryButton("Start Customer Order ->");
-        backBtn.addActionListener(e -> frame.showCard(PizzaAppFrame.CARD_CUSTOMER));
-        rightControls.add(backBtn);
+        JButton lockBtn = Theme.createDangerButton("🔒 Lock Terminal");
+        lockBtn.addActionListener(e -> frame.logoutStaff());
+        rightControls.add(lockBtn);
 
-        header.add(title, BorderLayout.WEST);
+        header.add(titleStack, BorderLayout.WEST);
         header.add(rightControls, BorderLayout.EAST);
 
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.setFont(Theme.FONT_LABEL);
-        tabs.addTab("Transactions & Orders (orders.txt)", buildOrdersTab());
-        tabs.addTab("Customer Directory (customers.txt)", buildCustomersTab());
-        tabs.addTab("Staff & Employees (staff.txt)", buildStaffTab());
+        // Pill Tabs Row
+        JPanel tabsRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        tabsRow.setOpaque(false);
+        Theme.TogglePillButton ordersTabPill = new Theme.TogglePillButton("TRANSACTIONS & RECEIPTS", true);
+        Theme.TogglePillButton customersTabPill = new Theme.TogglePillButton("CUSTOMER DIRECTORY", false);
+        Theme.TogglePillButton staffTabPill = new Theme.TogglePillButton("STAFF & WORKERS", false);
+
+        ButtonGroup tabGroup = new ButtonGroup();
+        tabGroup.add(ordersTabPill);
+        tabGroup.add(customersTabPill);
+        tabGroup.add(staffTabPill);
+
+        ordersTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_ORDERS));
+        customersTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_CUSTOMERS));
+        staffTabPill.addActionListener(e -> tabCardLayout.show(tabContentPanel, TAB_STAFF));
+
+        tabsRow.add(ordersTabPill);
+        tabsRow.add(customersTabPill);
+        tabsRow.add(staffTabPill);
+
+        tabContentPanel.setOpaque(false);
+        tabContentPanel.add(buildOrdersTab(), TAB_ORDERS);
+        tabContentPanel.add(buildCustomersTab(), TAB_CUSTOMERS);
+        tabContentPanel.add(buildStaffTab(), TAB_STAFF);
+        tabCardLayout.show(tabContentPanel, TAB_ORDERS);
+
+        JPanel centerContainer = new JPanel(new BorderLayout(0, 12));
+        centerContainer.setOpaque(false);
+        centerContainer.add(tabsRow, BorderLayout.NORTH);
+        centerContainer.add(tabContentPanel, BorderLayout.CENTER);
 
         add(header, BorderLayout.NORTH);
-        add(tabs, BorderLayout.CENTER);
+        add(centerContainer, BorderLayout.CENTER);
     }
 
     /**
@@ -162,14 +227,16 @@ public class AdminPanel extends JPanel {
      * @return constructed orders tab {@link JPanel}
      */
     private JPanel buildOrdersTab() {
-        JPanel p = new JPanel(new BorderLayout(0, 8));
-        p.setBackground(Theme.BG_CARD);
-        styleTable(ordersTable);
-        p.add(new JScrollPane(ordersTable), BorderLayout.CENTER);
+        Theme.RoundedCardPanel p = Theme.createCardPanel("All Store Transactions (data/orders.txt)");
+        p.setLayout(new BorderLayout(0, 10));
+        Theme.styleTable(ordersTable);
+        JScrollPane scroll = new JScrollPane(ordersTable);
+        Theme.styleScrollPane(scroll);
+        p.add(scroll, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         bottom.setOpaque(false);
-        JButton viewReceiptBtn = Theme.createPrimaryButton("View Selected Order Receipt");
+        JButton viewReceiptBtn = Theme.createPrimaryButton("Print / View Selected Order Receipt");
         viewReceiptBtn.addActionListener(e -> viewSelectedOrderReceipt());
         bottom.add(viewReceiptBtn);
         p.add(bottom, BorderLayout.SOUTH);
@@ -182,45 +249,58 @@ public class AdminPanel extends JPanel {
      * @return constructed customers tab {@link JPanel}
      */
     private JPanel buildCustomersTab() {
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBackground(Theme.BG_CARD);
-        styleTable(customersTable);
-        p.add(new JScrollPane(customersTable), BorderLayout.CENTER);
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Registered Customers (data/customers.txt)");
+        p.setLayout(new BorderLayout());
+        Theme.styleTable(customersTable);
+        JScrollPane scroll = new JScrollPane(customersTable);
+        Theme.styleScrollPane(scroll);
+        p.add(scroll, BorderLayout.CENTER);
         return p;
     }
 
     /**
-     * Builds the Staff Directory tab including quick staff enrollment into {@code staff.txt}.
+     * Builds the Staff Directory tab including password mask toggle and new employee enrollment.
      *
      * @return constructed staff tab {@link JPanel}
      */
     private JPanel buildStaffTab() {
-        JPanel p = new JPanel(new BorderLayout(0, 10));
-        p.setBackground(Theme.BG_CARD);
-        styleTable(staffTable);
-        p.add(new JScrollPane(staffTable), BorderLayout.CENTER);
+        Theme.RoundedCardPanel p = Theme.createCardPanel("Staff Accounts & Enrollment (data/staff.txt)");
+        p.setLayout(new BorderLayout(0, 10));
+        Theme.styleTable(staffTable);
+        JScrollPane scroll = new JScrollPane(staffTable);
+        Theme.styleScrollPane(scroll);
+        p.add(scroll, BorderLayout.CENTER);
 
-        JPanel enrollBar = Theme.createCardPanel("Enroll New Staff Account into staff.txt");
+        Theme.RoundedCardPanel enrollBar = Theme.createCardPanel("Enroll New Staff Account");
         enrollBar.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        enrollBar.add(Theme.createFieldLabel("Username:"));
+        Theme.styleComboBox(newStaffRoleCombo);
+
+        enrollBar.add(Theme.createFieldLabel("USER:"));
         enrollBar.add(newStaffUserField);
-        enrollBar.add(Theme.createFieldLabel("Password:"));
+        enrollBar.add(Theme.createFieldLabel("PASS:"));
         enrollBar.add(newStaffPassField);
-        enrollBar.add(Theme.createFieldLabel("Full Name:"));
+        enrollBar.add(Theme.createFieldLabel("NAME:"));
         enrollBar.add(newStaffNameField);
-        enrollBar.add(Theme.createFieldLabel("Role:"));
+        enrollBar.add(Theme.createFieldLabel("ROLE:"));
         enrollBar.add(newStaffRoleCombo);
 
         JButton addStaffBtn = Theme.createPrimaryButton("+ Enroll Staff");
         addStaffBtn.addActionListener(e -> enrollStaffMember());
         enrollBar.add(addStaffBtn);
 
+        JButton togglePassBtn = Theme.createSecondaryButton("👁 Show / Hide Passwords");
+        togglePassBtn.addActionListener(e -> {
+            showStaffPasswords = !showStaffPasswords;
+            refreshAllTables();
+        });
+        enrollBar.add(togglePassBtn);
+
         p.add(enrollBar, BorderLayout.SOUTH);
         return p;
     }
 
     /**
-     * Reloads all three tables and updates revenue summary metrics from disk.
+     * Reloads all three tables and recalculates revenue KPI metrics from disk.
      */
     public final void refreshAllTables() {
         ordersModel.setRowCount(0);
@@ -239,8 +319,8 @@ public class AdminPanel extends JPanel {
                     o.getTimestamp(),
                     o.getCustomerName(),
                     o.getCustomerPhone(),
-                    o.getOrderType(),
-                    o.getPaymentMethod(),
+                    o.getOrderType().toUpperCase(),
+                    o.getPaymentMethod().toUpperCase(),
                     Theme.formatCurrency(o.getSubtotal()),
                     Theme.formatCurrency(o.getTax()),
                     Theme.formatCurrency(o.getTip()),
@@ -249,8 +329,8 @@ public class AdminPanel extends JPanel {
             });
         }
 
-        kpiSummaryLabel.setText(String.format("Gross Revenue: $%.2f  |  Tax: $%.2f  |  Tips: $%.2f",
-                gross, taxTotal, tipTotal));
+        kpiSummaryLabel.setText(String.format("GROSS: $%.2f  •  TIPS: $%.2f  •  TAX: $%.2f",
+                gross, tipTotal, taxTotal));
 
         customersModel.setRowCount(0);
         for (Customer c : dataStore.loadCustomers()) {
@@ -258,7 +338,7 @@ public class AdminPanel extends JPanel {
                     "#" + c.getId(),
                     c.getName(),
                     c.getFormattedPhone(),
-                    c.getOrderType(),
+                    c.getOrderType().toUpperCase(),
                     c.getStreetAddress(),
                     c.getSubdivision(),
                     c.getNearestIntersection()
@@ -270,18 +350,19 @@ public class AdminPanel extends JPanel {
             staffModel.addRow(new Object[]{
                     "#" + u.getId(),
                     u.getUsername(),
+                    showStaffPasswords ? u.getPassword() : "••••••••",
                     u.getFullName(),
                     u.getRole().toUpperCase(),
                     u.getPhone(),
                     u.getEmail(),
                     u.getDateHired(),
-                    u.isActive() ? "Active" : "Archived"
+                    u.isActive() ? "ACTIVE" : "ARCHIVED"
             });
         }
     }
 
     /**
-     * Opens a popup dialog displaying the formatted receipt for the selected order row.
+     * Opens a styled popup displaying the full thermal-style receipt for the selected order row.
      */
     private void viewSelectedOrderReceipt() {
         int row = ordersTable.getSelectedRow();
@@ -298,8 +379,9 @@ public class AdminPanel extends JPanel {
                 area.setFont(Theme.FONT_MONO);
                 area.setBackground(Theme.RECEIPT_PAPER);
                 area.setForeground(Theme.RECEIPT_INK);
+                area.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
                 JScrollPane sp = new JScrollPane(area);
-                sp.setPreferredSize(new java.awt.Dimension(460, 460));
+                sp.setPreferredSize(new Dimension(480, 500));
                 JOptionPane.showMessageDialog(this, sp, "Order #" + targetId + " Receipt", JOptionPane.PLAIN_MESSAGE);
                 return;
             }
@@ -331,19 +413,5 @@ public class AdminPanel extends JPanel {
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Duplicate Username", JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    /**
-     * Applies consistent dark stone styling and readable row height to a {@link JTable}.
-     *
-     * @param table table component to style
-     */
-    private void styleTable(JTable table) {
-        table.setBackground(Theme.BG_INPUT);
-        table.setForeground(Theme.TEXT_PRIMARY);
-        table.setFont(Theme.FONT_BODY);
-        table.setRowHeight(24);
-        table.setGridColor(Theme.BORDER_STONE);
-        table.getTableHeader().setFont(Theme.FONT_LABEL);
     }
 }
