@@ -1,0 +1,6 @@
+build/
+dist/
+data/receipt_*.txt
+data/cook_slip_*.txt
+data/daily_summary.txt
+*.zip

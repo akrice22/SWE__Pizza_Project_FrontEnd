@@ -1,0 +1,4 @@
+# id|username|password|fullName|role|phone|email|dateHired|active
+1|owner|pizza123|Store Owner|owner|555-111-2222|owner@momandpoppizza.com|2020-01-15|true
+2|manager1|pizza123|Amy Rice|manager|555-222-3333|amy@momandpoppizza.com|2021-06-01|true
+3|worker1|pizza123|John Dough|worker|555-333-4444|john@momandpoppizza.com|2023-09-10|true
